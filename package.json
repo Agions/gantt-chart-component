@@ -1,0 +1,21 @@
+{
+  "name": "gantt-chart-component",
+  "version": "1.0.2",
+  "description": "这是一个同时支持React和Vue的甘特图组件，可用于项目管理和任务进度展示",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "甘特图"
+  ],
+  "author": "agions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agions/gantt-chart-component.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}
