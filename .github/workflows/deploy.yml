@@ -17,7 +17,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-          cache: 'npm'
+          # 移除缓存设置，因为我们忽略了锁文件
+          # cache: 'npm'
 
       - name: Install Dependencies 🔧
         run: npm install --force --legacy-peer-deps
