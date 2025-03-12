@@ -20,7 +20,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies 🔧
-        run: npm ci --legacy-peer-deps
+        run: npm install --force --legacy-peer-deps
 
       - name: Build 🏗️
         run: npx react-scripts build
