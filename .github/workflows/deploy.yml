@@ -20,10 +20,10 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies 🔧
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build 🏗️
-        run: npm run build
+        run: npx react-scripts build
         env:
           CI: false # 这让React不会因为警告而停止构建
 
