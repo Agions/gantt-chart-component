@@ -3,9 +3,12 @@
  * 甘特图核心功能类，处理数据和渲染逻辑
  */
 
+// 导入StateManager的工厂函数
+import createStateManager from './StateManager';
+
 class GanttChartCore {
   constructor(options = {}) {
-    this.stateManager = new StateManager({
+    this.stateManager = createStateManager({
       tasks: options.tasks || [],
       dependencies: options.dependencies || [],
       viewSettings: {

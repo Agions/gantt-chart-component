@@ -1,68 +1,275 @@
-import { GanttChartOptions, Task, ViewMode } from "./types"
-import { daysBetween, addDays, getWeekNumber, getMonthName, parseDate, exportToImage, exportToPDF, formatDate } from "./utils"
+/**
+ * GanttChartCore.ts
+ * 甘特图核心类，负责图表渲染、事件处理和数据管理
+ * @module GanttChartCore
+ */
+import { 
+  GanttChartOptions, 
+  Task, 
+  TaskId,
+  ViewMode, 
+  DragData, 
+  DragType,
+  ResizeType,
+  VirtualWindow,
+  ExportOptions,
+  Dependency,
+  Resource
+} from "./types";
+import { 
+  DateUtils, 
+  TaskUtils, 
+  UIUtils, 
+  ExportUtils, 
+  debounce, 
+  throttle 
+} from "./utils";
+import createStateManager, { StateManager } from './StateManager';
+import createImageExporter, { ImageExporter } from './ImageExporter';
+import createDataExporter, { DataExporter } from './DataExporter';
+import createPrintManager, { PrintManager } from './PrintManager';
 
-export default class GanttChartCore {
-  options: GanttChartOptions
-  tasks: Task[]
-  startDate: Date
-  endDate: Date
-  element: HTMLElement | null = null
-  private virtualScrolling: boolean = false
-  private visibleTaskCount: number = 50
-  private bufferSize: number = 10
-  private visibleTasks: Task[] = []
-  private scrollTop: number = 0
-  private containerHeight: number = 0
-  private resizeObserver: ResizeObserver | null = null
-  private onMouseMove: (e: MouseEvent) => void
-  private onMouseUp: (e: MouseEvent) => void
-  private onResizeMove: (e: MouseEvent) => void
-  private onResizeEnd: (e: MouseEvent) => void
-  private handleScroll: () => void
+/**
+ * 甘特图事件类型
+ */
+enum GanttEventType {
+  TASK_CLICK = 'task:click',
+  TASK_DBLCLICK = 'task:dblclick',
+  TASK_DRAG_START = 'task:dragstart',
+  TASK_DRAG = 'task:drag',
+  TASK_DRAG_END = 'task:dragend',
+  TASK_RESIZE_START = 'task:resizestart',
+  TASK_RESIZE = 'task:resize',
+  TASK_RESIZE_END = 'task:resizeend',
+  TASK_PROGRESS_CHANGE = 'task:progress',
+  DEPENDENCY_CLICK = 'dependency:click',
+  VIEW_CHANGE = 'view:change',
+  DATE_CHANGE = 'date:change',
+  SCROLL = 'scroll',
+  RENDER = 'render',
+  ERROR = 'error'
+}
 
-  // 用于拖拽的临时数据
-  private dragData: {
-    bar: HTMLElement
-    task: Task
-    startX: number
-    originalLeft: number
-    originalWidth: number
-    resizeType?: "left" | "right"
-    type?: "move" | "resize_left" | "resize_right" | "progress"
-  } | null = null
+/**
+ * 事件回调类型
+ */
+type EventCallback = (...args: any[]) => void;
 
+/**
+ * 事件映射类型
+ */
+interface EventMap {
+  [eventName: string]: EventCallback[];
+}
+
+/**
+ * 甘特图核心类
+ * 负责图表渲染、事件处理和数据管理
+ */
+export class GanttChartCore {
+  /** 配置选项 */
+  private readonly _options: GanttChartOptions;
+  /** 任务列表 */
+  private _tasks: Task[];
+  /** 依赖关系列表 */
+  private _dependencies: Dependency[];
+  /** 开始日期 */
+  private _startDate: Date;
+  /** 结束日期 */
+  private _endDate: Date;
+  /** DOM 元素 */
+  private _element: HTMLElement | null = null;
+  /** 事件监听器映射 */
+  private _eventListeners: Map<string, Function[]> = new Map();
+  /** 状态管理器 */
+  private _stateManager: StateManager;
+  
+  /** 虚拟滚动相关属性 */
+  private _virtualScrolling: boolean = false;
+  private _visibleTaskCount: number = 50;
+  private _bufferSize: number = 10;
+  private _visibleTasks: Task[] = [];
+  private _scrollTop: number = 0;
+  private _containerHeight: number = 0;
+  
+  /** 监听器和观察者 */
+  private _resizeObserver: ResizeObserver | null = null;
+  private _mutationObserver: MutationObserver | null = null;
+  private _intersectionObserver: IntersectionObserver | null = null;
+  
+  /** 事件处理函数引用 */
+  private readonly _onMouseMove: (e: MouseEvent) => void;
+  private readonly _onMouseUp: (e: MouseEvent) => void;
+  private readonly _onResizeMove: (e: MouseEvent) => void;
+  private readonly _onResizeEnd: (e: MouseEvent) => void;
+  private readonly _onTaskClick: (e: MouseEvent) => void;
+  private readonly _onTaskDoubleClick: (e: MouseEvent) => void;
+  private readonly _handleScroll: () => void;
+  
+  /** 拖拽数据 */
+  private _dragData: DragData | null = null;
+  
+  /** 渲染标志 */
+  private _needsRender: boolean = false;
+  private _animationFrameId: number | null = null;
+  
+  /** 主题配置 */
+  private _theme: Record<string, string> = {};
+  
+  /** 图片导出工具 */
+  private imageExporter: ImageExporter;
+  
+  /** 数据导出工具 */
+  private dataExporter: DataExporter;
+  
+  /** 打印管理器 */
+  private printManager: PrintManager;
+  
+  /** 是否已销毁 */
+  private isDestroyed: boolean = false;
+  
+  /** 缩放级别 */
+  private zoomLevel: number = 1;
+  
+  /**
+   * 创建甘特图实例
+   * @param {GanttChartOptions} options - 甘特图配置选项
+   */
   constructor(options: GanttChartOptions) {
-    this.options = options
-    this.tasks = options.tasks || []
-    this.startDate = options.startDate || new Date()
-    this.endDate = options.endDate || this.calculateEndDate()
-    this.virtualScrolling = options.virtualScrolling || false
-    this.visibleTaskCount = options.visibleTaskCount || 50
-    this.bufferSize = options.bufferSize || 10
-
-    // 绑定方法
-    this.onMouseMove = this.onMouseMoveHandler.bind(this)
-    this.onMouseUp = this.onMouseUpHandler.bind(this)
-    this.onResizeMove = this.onResizeMoveHandler.bind(this)
-    this.onResizeEnd = this.onResizeEndHandler.bind(this)
-
-    // 性能优化：使用防抖处理滚动事件
-    this.handleScroll = this.debounce(this.handleScrollHandler.bind(this), 16)
+    // 配置和数据初始化
+    this._options = this._prepareOptions(options);
+    this._tasks = options.tasks || [];
+    this._dependencies = options.dependencies || [];
+    this._startDate = options.startDate ? DateUtils.parseDate(options.startDate) : new Date();
+    this._endDate = options.endDate ? DateUtils.parseDate(options.endDate) : this._calculateEndDate();
+    
+    // 虚拟滚动设置
+    this._virtualScrolling = options.virtualScrolling || false;
+    this._visibleTaskCount = options.visibleTaskCount || 50;
+    this._bufferSize = options.bufferSize || 10;
+    
+    // 绑定方法到实例
+    this._onMouseMove = this._onMouseMoveHandler.bind(this);
+    this._onMouseUp = this._onMouseUpHandler.bind(this);
+    this._onResizeMove = this._onResizeMoveHandler.bind(this);
+    this._onResizeEnd = this._onResizeEndHandler.bind(this);
+    this._onTaskClick = this._handleTaskClick.bind(this);
+    this._onTaskDoubleClick = this._handleTaskDoubleClick.bind(this);
+    
+    // 性能优化：使用防抖和节流
+    this._handleScroll = debounce(this._handleScrollHandler.bind(this), 16);
+    
+    // 初始化状态管理器
+    this._stateManager = createStateManager({
+      tasks: this._tasks,
+      dependencies: this._dependencies,
+      resources: options.resources || [],
+      selectedTaskIds: [],
+      viewSettings: {
+        mode: options.viewMode || 'day',
+        scrollPosition: 0,
+        zoomLevel: 1,
+        taskListWidth: 300,
+        timelineWidth: 0,
+        startDate: this._startDate,
+        endDate: this._endDate
+      },
+      virtualScroll: {
+        startIndex: 0,
+        endIndex: 0,
+        visibleCount: this._visibleTaskCount,
+        bufferSize: this._bufferSize,
+        totalHeight: 0,
+        rowHeight: options.rowHeight || 40
+      },
+      config: {
+        columnWidth: options.columnWidth || 60,
+        rowHeight: options.rowHeight || 40,
+        showWeekends: options.showWeekends !== undefined ? options.showWeekends : true,
+        showToday: options.showToday !== undefined ? options.showToday : true,
+        showRowLines: options.showRowLines !== undefined ? options.showRowLines : true,
+        showColumnLines: options.showColumnLines !== undefined ? options.showColumnLines : true,
+        enableDragging: options.enableDragging !== undefined ? options.enableDragging : true,
+        enableResizing: options.enableResizing !== undefined ? options.enableResizing : true,
+        enableProgress: options.enableProgress !== undefined ? options.enableProgress : true,
+        enableDependencies: options.enableDependencies !== undefined ? options.enableDependencies : true,
+        respectDependencies: options.respectDependencies !== undefined ? options.respectDependencies : true,
+        locale: options.locale || 'zh-CN'
+      }
+    });
+    
+    // 初始化主题
+    this._initializeTheme();
+    
+    // 初始化导出工具
+    this.imageExporter = createImageExporter(this._element);
+    this.dataExporter = createDataExporter(
+      this._tasks,
+      this._dependencies,
+      options.resources || []
+    );
+    this.printManager = createPrintManager(this._element);
+    
+    // 初始化渲染
+    this.render(this._element);
+    
+    // 添加事件监听器
+    this.attachEventListeners();
+  }
+  
+  /**
+   * 获取任务列表的只读副本
+   * @returns {ReadonlyArray<Task>} 任务列表
+   */
+  public get tasks(): ReadonlyArray<Task> {
+    return [...this._tasks];
+  }
+  
+  /**
+   * 获取依赖关系列表的只读副本
+   * @returns {ReadonlyArray<Dependency>} 依赖关系列表
+   */
+  public get dependencies(): ReadonlyArray<Dependency> {
+    return [...this._dependencies];
+  }
+  
+  /**
+   * 获取当前开始日期
+   * @returns {Date} 开始日期
+   */
+  public get startDate(): Date {
+    return new Date(this._startDate);
+  }
+  
+  /**
+   * 获取当前结束日期
+   * @returns {Date} 结束日期
+   */
+  public get endDate(): Date {
+    return new Date(this._endDate);
+  }
+  
+  /**
+   * 获取当前视图模式
+   * @returns {ViewMode} 视图模式
+   */
+  public get viewMode(): ViewMode {
+    return this._stateManager.state.viewSettings.mode;
   }
 
   /**
    * 计算甘特图结束日期
    */
-  calculateEndDate(): Date {
-    if (!this.tasks.length) {
+  private _calculateEndDate(): Date {
+    if (!this._tasks.length) {
       const date = new Date()
       date.setMonth(date.getMonth() + 1)
       return date
     }
-    return this.tasks.reduce((max, task) => {
+    return this._tasks.reduce((max, task) => {
       const end = new Date(task.end)
       return end > max ? end : max
-    }, new Date(this.tasks[0].end))
+    }, new Date(this._tasks[0].end))
   }
 
   /**
@@ -70,23 +277,23 @@ export default class GanttChartCore {
    */
   render(element: HTMLElement): void {
     if (!element) return
-    this.element = element
+    this._element = element
     // 清空容器
     while (element.firstChild) {
       element.removeChild(element.firstChild)
     }
 
     // 性能优化：监听容器大小变化
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect()
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect()
     }
-    this.resizeObserver = new ResizeObserver(this.handleResizeHandler.bind(this))
-    this.resizeObserver.observe(element)
+    this._resizeObserver = new ResizeObserver(this._handleResizeHandler.bind(this))
+    this._resizeObserver.observe(element)
 
     // 初始化虚拟滚动
-    if (this.virtualScrolling) {
-      this.containerHeight = element.clientHeight
-      this.initVirtualScrolling()
+    if (this._virtualScrolling) {
+      this._containerHeight = element.clientHeight
+      this._initVirtualScrolling()
     }
 
     // 创建甘特图容器
@@ -94,52 +301,52 @@ export default class GanttChartCore {
     container.className = "gantt-container"
 
     // 添加表头
-    const header = this.createHeader()
+    const header = this._createHeader()
     container.appendChild(header)
 
     // 添加任务区域
-    const taskContainer = this.createTaskContainer()
+    const taskContainer = this._createTaskContainer()
     container.appendChild(taskContainer)
 
     // 如果开启依赖关系显示，则添加SVG图层
-    if (this.options.enableDependencies) {
-      const dependencyLayer = this.createDependencyLayer()
+    if (this._options.enableDependencies) {
+      const dependencyLayer = this._createDependencyLayer()
       container.appendChild(dependencyLayer)
     }
 
     element.appendChild(container)
 
     // 绑定事件
-    this.bindEvents()
+    this._bindEvents()
   }
 
   /**
    * 创建时间轴表头
    */
-  createHeader(): HTMLElement {
+  private _createHeader(): HTMLElement {
     const header = document.createElement("div")
     header.className = "gantt-header"
 
     const timeline = document.createElement("div")
     timeline.className = "gantt-timeline"
 
-    const totalDays = daysBetween(this.startDate, this.endDate)
-    const columnWidth = this.options.columnWidth || 40
+    const totalDays = DateUtils.daysBetween(this._startDate, this._endDate)
+    const columnWidth = this._options.columnWidth || 40
 
     for (let i = 0; i <= totalDays; i++) {
-      const date = new Date(this.startDate)
+      const date = new Date(this._startDate)
       date.setDate(date.getDate() + i)
 
       const dayLabel = document.createElement("div")
       dayLabel.className = "gantt-day"
       dayLabel.style.width = `${columnWidth}px`
 
-      if (this.options.viewMode === "day") {
+      if (this._options.viewMode === "day") {
         dayLabel.textContent = String(date.getDate())
-      } else if (this.options.viewMode === "week") {
-        dayLabel.textContent = String(getWeekNumber(date))
-      } else if (this.options.viewMode === "month") {
-        dayLabel.textContent = getMonthName(date, true)
+      } else if (this._options.viewMode === "week") {
+        dayLabel.textContent = String(DateUtils.getWeekNumber(date))
+      } else if (this._options.viewMode === "month") {
+        dayLabel.textContent = DateUtils.getMonthName(date, true)
       } else {
         dayLabel.textContent = String(date.getDate())
       }
@@ -154,22 +361,22 @@ export default class GanttChartCore {
   /**
    * 创建任务区域
    */
-  createTaskContainer(): HTMLElement {
+  private _createTaskContainer(): HTMLElement {
     const taskContainer = document.createElement("div")
     taskContainer.className = "gantt-task-container"
 
-    const columnWidth = this.options.columnWidth || 40
-    const rowHeight = this.options.rowHeight || 40
+    const columnWidth = this._options.columnWidth || 40
+    const rowHeight = this._options.rowHeight || 40
 
     // 如果启用虚拟滚动，设置容器样式
-    if (this.virtualScrolling) {
+    if (this._virtualScrolling) {
       taskContainer.style.position = "relative"
-      taskContainer.style.height = `${this.tasks.length * rowHeight}px`
+      taskContainer.style.height = `${this._tasks.length * rowHeight}px`
       taskContainer.classList.add("gantt-virtual-scroll")
     }
 
     // 确定要渲染的任务
-    const tasksToRender = this.virtualScrolling ? this.visibleTasks : this.tasks
+    const tasksToRender = this._virtualScrolling ? this._visibleTasks : this._tasks
 
     // 遍历任务并创建任务行
     tasksToRender.forEach((task) => {
@@ -177,8 +384,8 @@ export default class GanttChartCore {
       taskRow.className = "gantt-task-row"
 
       // 如果是虚拟滚动，设置任务行的位置
-      if (this.virtualScrolling) {
-        const taskIndex = this.tasks.findIndex((t) => t.id === task.id)
+      if (this._virtualScrolling) {
+        const taskIndex = this._tasks.findIndex((t) => t.id === task.id)
         taskRow.style.position = "absolute"
         taskRow.style.top = `${taskIndex * rowHeight}px`
         taskRow.style.width = "100%"
@@ -205,8 +412,8 @@ export default class GanttChartCore {
         taskBar.classList.add(task.type)
       }
 
-      const offset = this.getTaskOffset(task)
-      const width = this.getTaskWidth(task)
+      const offset = this._getTaskOffset(task)
+      const width = this._getTaskWidth(task)
       // 200px 为任务标签占用的宽度
       taskBar.style.left = `${offset + 200}px`
       taskBar.style.width = `${width}px`
@@ -216,7 +423,7 @@ export default class GanttChartCore {
       // 如果有进度，添加进度条
       if (
         task.progress !== undefined &&
-        this.options.enableProgress !== false
+        this._options.enableProgress !== false
       ) {
         const progressBar = document.createElement("div")
         progressBar.className = "gantt-task-progress"
@@ -228,12 +435,12 @@ export default class GanttChartCore {
       }
 
       // 如果开启拖拽，则设置样式和添加拖拽手柄
-      if (this.options.enableDragging !== false && task.draggable !== false) {
+      if (this._options.enableDragging !== false && task.draggable !== false) {
         taskBar.style.cursor = "move"
       }
 
       // 如果开启调整大小，添加调整大小的手柄
-      if (this.options.enableResizing !== false && task.resizable !== false) {
+      if (this._options.enableResizing !== false && task.resizable !== false) {
         const leftHandle = document.createElement("div")
         leftHandle.className = "gantt-task-resize-handle left"
         leftHandle.setAttribute("data-resize", "left")
@@ -251,11 +458,11 @@ export default class GanttChartCore {
     })
 
     // 如果启用显示今天线
-    if (this.options.showToday) {
+    if (this._options.showToday) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
 
-      const todayOffset = this.getDateOffset(today)
+      const todayOffset = this._getDateOffset(today)
       if (todayOffset >= 0) {
         const todayLine = document.createElement("div")
         todayLine.className = "gantt-today-line"
@@ -270,36 +477,43 @@ export default class GanttChartCore {
   /**
    * 获取日期相对于起始日期的偏移量（以像素为单位）
    */
-  getDateOffset(date: Date): number {
-    const columnWidth = this.options.columnWidth || 40
-    const diffDays = daysBetween(this.startDate, date)
+  private _getDateOffset(date: Date): number {
+    const columnWidth = this._options.columnWidth || 40
+    const diffDays = DateUtils.daysBetween(this._startDate, date)
     return diffDays * columnWidth
   }
 
   /**
    * 获取任务相对于起始日期的偏移量（以像素为单位）
+   * @param {Task} task - 任务对象
+   * @returns {number} 偏移量
+   * @private
    */
-  getTaskOffset(task: Task): number {
-    const columnWidth = this.options.columnWidth || 40
-    const diffDays = daysBetween(this.startDate, task.start)
-    return diffDays * columnWidth
+  private _getTaskOffset(task: Task): number {
+    const columnWidth = this._options.columnWidth || 40;
+    const startDate = DateUtils.parseDate(task.start);
+    const diffDays = DateUtils.daysBetween(this._startDate, startDate);
+    return diffDays * columnWidth;
   }
 
   /**
    * 获取任务条的宽度（以像素为单位）
+   * @param {Task} task - 任务对象
+   * @returns {number} 宽度
+   * @private
    */
-  getTaskWidth(task: Task): number {
-    const columnWidth = this.options.columnWidth || 40
-    const taskStart = new Date(task.start)
-    const taskEnd = new Date(task.end)
-    const diffDays = daysBetween(taskStart, taskEnd)
-    return (diffDays + 1) * columnWidth
+  private _getTaskWidth(task: Task): number {
+    const columnWidth = this._options.columnWidth || 40;
+    const taskStart = DateUtils.parseDate(task.start);
+    const taskEnd = DateUtils.parseDate(task.end);
+    const diffDays = DateUtils.daysBetween(taskStart, taskEnd);
+    return (diffDays + 1) * columnWidth;
   }
 
   /**
    * 创建依赖关系的SVG图层
    */
-  createDependencyLayer(): HTMLElement {
+  private _createDependencyLayer(): HTMLElement {
     const svgNS = "http://www.w3.org/2000/svg"
     const svg = document.createElementNS(svgNS, "svg")
     svg.classList.add("gantt-dependency-layer")
@@ -309,16 +523,16 @@ export default class GanttChartCore {
     svg.style.width = "100%"
     svg.style.height = "100%"
 
-    if (this.options.dependencies) {
-      this.options.dependencies.forEach((dep) => {
-        const fromBar = this.element?.querySelector(
+    if (this._options.dependencies) {
+      this._options.dependencies.forEach((dep) => {
+        const fromBar = this._element?.querySelector(
           `[data-task-id='${dep.fromId}']`
         ) as HTMLElement
-        const toBar = this.element?.querySelector(
+        const toBar = this._element?.querySelector(
           `[data-task-id='${dep.toId}']`
         ) as HTMLElement
-        if (fromBar && toBar && this.element) {
-          const containerRect = this.element.getBoundingClientRect()
+        if (fromBar && toBar && this._element) {
+          const containerRect = this._element.getBoundingClientRect()
           const fromRect = fromBar.getBoundingClientRect()
           const toRect = toBar.getBoundingClientRect()
 
@@ -346,51 +560,51 @@ export default class GanttChartCore {
   /**
    * 绑定任务条的事件（拖拽、点击、双击、调整大小等）
    */
-  bindEvents(): void {
-    if (!this.element) return
+  private _bindEvents(): void {
+    if (!this._element) return
 
-    const bars = this.element.querySelectorAll(".gantt-task-bar")
+    const bars = this._element.querySelectorAll(".gantt-task-bar")
     bars.forEach((bar) => {
       // 拖拽事件
-      if (this.options.enableDragging !== false) {
-        bar.addEventListener("mousedown", this.onMouseDown.bind(this) as EventListener)
+      if (this._options.enableDragging !== false) {
+        bar.addEventListener("mousedown", this._onMouseDown.bind(this) as EventListener)
       }
 
       // 点击事件
       bar.addEventListener("click", (e: Event) => {
         const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id")
-        const task = this.tasks.find((t) => String(t.id) === taskId)
-        if (task && this.options.onTaskClick) {
-          this.options.onTaskClick(task, e as MouseEvent)
+        const task = this._tasks.find((t) => String(t.id) === taskId)
+        if (task && this._options.onTaskClick) {
+          this._options.onTaskClick(task, e as MouseEvent)
         }
       })
 
       // 双击事件
       bar.addEventListener("dblclick", (e: Event) => {
         const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id")
-        const task = this.tasks.find((t) => String(t.id) === taskId)
-        if (task && this.options.onTaskDoubleClick) {
-          this.options.onTaskDoubleClick(task, e as MouseEvent)
+        const task = this._tasks.find((t) => String(t.id) === taskId)
+        if (task && this._options.onTaskDoubleClick) {
+          this._options.onTaskDoubleClick(task, e as MouseEvent)
         }
       })
 
       // 调整大小事件
-      if (this.options.enableResizing !== false) {
+      if (this._options.enableResizing !== false) {
         const resizeHandles = bar.querySelectorAll(".gantt-task-resize-handle")
         resizeHandles.forEach((handle) => {
           handle.addEventListener("mousedown", (e: Event) => {
             e.stopPropagation() // 阻止冒泡，避免触发拖拽
-            this.onResizeStart(e as MouseEvent)
+            this._onResizeStart(e as MouseEvent)
           })
         })
       }
 
       // 进度条拖拽事件
-      if (this.options.enableProgress !== false) {
+      if (this._options.enableProgress !== false) {
         bar.addEventListener("mousemove", (e: Event) => {
           const mouseEvent = e as MouseEvent;
           const taskId = (e.currentTarget as HTMLElement).getAttribute("data-task-id")
-          const task = this.tasks.find((t) => String(t.id) === taskId)
+          const task = this._tasks.find((t) => String(t.id) === taskId)
           if (!task) return
 
           // 计算鼠标在任务条内的相对位置
@@ -399,22 +613,22 @@ export default class GanttChartCore {
           const percent = Math.min(100, Math.max(0, (relativeX / rect.width) * 100))
 
           // 显示进度提示
-          if (mouseEvent.buttons === 1 && this.options.onProgressChange) {
-            this.options.onProgressChange(task, percent)
+          if (mouseEvent.buttons === 1 && this._options.onProgressChange) {
+            this._options.onProgressChange(task, percent)
           }
         })
       }
     })
 
     // 视图切换事件
-    if (this.options.onViewChange) {
+    if (this._options.onViewChange) {
       const viewModes: ViewMode[] = ["day", "week", "month", "quarter", "year"]
       viewModes.forEach((mode) => {
-        const button = this.element?.querySelector(`.gantt-view-${mode}`)
+        const button = this._element?.querySelector(`.gantt-view-${mode}`)
         if (button) {
           button.addEventListener("click", () => {
-            if (this.options.onViewChange) {
-              this.options.onViewChange(mode)
+            if (this._options.onViewChange) {
+              this._options.onViewChange(mode)
             }
           })
         }
@@ -425,202 +639,202 @@ export default class GanttChartCore {
   /**
    * 鼠标按下事件处理（开始拖拽）
    */
-  onMouseDown(e: MouseEvent): void {
-    e.preventDefault()
-    const target = e.currentTarget as HTMLElement
-    const taskId = target.getAttribute("data-task-id")
-    const task = this.tasks.find((t) => String(t.id) === taskId)
+  private _onMouseDown(e: MouseEvent): void {
+    e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    const taskId = target.getAttribute("data-task-id");
+    const task = this._tasks.find((t) => String(t.id) === taskId);
     if (task && (task.draggable !== false || task.draggable === undefined)) {
-      target.classList.add("dragging")
-      this.dragData = {
+      target.classList.add("dragging");
+      this._dragData = {
         bar: target,
         task,
         startX: e.clientX,
         originalLeft: parseInt(target.style.left, 10) || 0,
-        originalWidth: parseInt(target.style.width, 10) || 0
-      }
-      document.addEventListener("mousemove", this.onMouseMove)
-      document.addEventListener("mouseup", this.onMouseUp)
+        originalWidth: parseInt(target.style.width, 10) || 0,
+        type: "move" // 添加必要的type属性
+      };
+      document.addEventListener("mousemove", this._onMouseMove);
+      document.addEventListener("mouseup", this._onMouseUp);
     }
   }
 
   /**
    * 开始调整大小事件处理
    */
-  onResizeStart(e: MouseEvent): void {
-    e.preventDefault()
-    const handle = e.target as HTMLElement
-    const bar = handle.parentElement as HTMLElement
-    if (!bar) return
+  private _onResizeStart(e: MouseEvent): void {
+    e.preventDefault();
+    const handle = e.target as HTMLElement;
+    const resizeType = handle.getAttribute("data-resize") as ResizeType;
+    const bar = handle.parentElement as HTMLElement;
 
-    const taskId = bar.getAttribute("data-task-id")
-    const task = this.tasks.find((t) => String(t.id) === taskId)
-    if (!task || task.resizable === false) return
+    if (!bar) return;
 
-    const resizeType = handle.getAttribute("data-resize") as "left" | "right" | null
-    if (!resizeType) return
+    const taskId = bar.getAttribute("data-task-id");
+    const task = this._tasks.find((t) => String(t.id) === taskId);
+    if (!task || task.resizable === false) return;
 
-    const originalWidth = parseInt(bar.style.width, 10) || 0
-    const originalLeft = parseInt(bar.style.left, 10) || 0
+    bar.classList.add("resizing");
 
     // 设置调整大小数据
-    this.dragData = {
+    this._dragData = {
       bar,
       task,
       startX: e.clientX,
-      originalLeft,
-      originalWidth,
-      resizeType
-    }
+      originalLeft: parseInt(bar.style.left, 10) || 0,
+      originalWidth: parseInt(bar.style.width, 10) || 0,
+      resizeType,
+      type: resizeType === "left" ? "resize_left" : "resize_right" // 添加必要的type属性
+    };
 
-    document.addEventListener("mousemove", this.onResizeMove)
-    document.addEventListener("mouseup", this.onResizeEnd)
+    document.addEventListener("mousemove", this._onResizeMove);
+    document.addEventListener("mouseup", this._onResizeEnd);
   }
 
   /**
    * 调整大小移动事件处理
    */
-  private onResizeMoveHandler(e: MouseEvent): void {
-    if (!this.dragData || !this.dragData.resizeType) return
+  private _onResizeMoveHandler(e: MouseEvent): void {
+    if (!this._dragData || !this._dragData.resizeType) return
 
-    const deltaX = e.clientX - this.dragData.startX
-    const columnWidth = this.options.columnWidth || 40
+    const deltaX = e.clientX - this._dragData.startX
+    const columnWidth = this._options.columnWidth || 40
 
-    if (this.dragData.resizeType === "right") {
+    if (this._dragData.resizeType === "right") {
       // 调整右侧（改变宽度）
-      let newWidth = Math.max(columnWidth, this.dragData.originalWidth + deltaX)
+      let newWidth = Math.max(columnWidth, this._dragData.originalWidth + deltaX)
       // 吸附到网格
       newWidth = Math.round(newWidth / columnWidth) * columnWidth
-      this.dragData.bar.style.width = `${newWidth}px`
-    } else if (this.dragData.resizeType === "left") {
+      this._dragData.bar.style.width = `${newWidth}px`
+    } else if (this._dragData.resizeType === "left") {
       // 调整左侧（改变左边距和宽度）
-      let newLeft = this.dragData.originalLeft + deltaX
-      let newWidth = this.dragData.originalWidth - deltaX
+      let newLeft = this._dragData.originalLeft + deltaX
+      let newWidth = this._dragData.originalWidth - deltaX
 
       // 确保最小宽度
       if (newWidth < columnWidth) {
         newWidth = columnWidth
-        newLeft = this.dragData.originalLeft + this.dragData.originalWidth - columnWidth
+        newLeft = this._dragData.originalLeft + this._dragData.originalWidth - columnWidth
       }
 
       // 吸附到网格
       newLeft = Math.round(newLeft / columnWidth) * columnWidth
       newWidth = Math.round(newWidth / columnWidth) * columnWidth
 
-      this.dragData.bar.style.left = `${newLeft}px`
-      this.dragData.bar.style.width = `${newWidth}px`
+      this._dragData.bar.style.left = `${newLeft}px`
+      this._dragData.bar.style.width = `${newWidth}px`
     }
 
     // 计算新的日期
-    const currentLeft = parseInt(this.dragData.bar.style.left, 10) - 200 // 减去标签宽度
-    const currentWidth = parseInt(this.dragData.bar.style.width, 10)
+    const currentLeft = parseInt(this._dragData.bar.style.left, 10) - 200 // 减去标签宽度
+    const currentWidth = parseInt(this._dragData.bar.style.width, 10)
     const shiftDays = Math.round(currentLeft / columnWidth)
     const durationDays = Math.round(currentWidth / columnWidth)
 
-    const newStart = addDays(this.startDate, shiftDays)
-    const newEnd = addDays(this.startDate, shiftDays + durationDays - 1)
+    const newStart = DateUtils.addDays(this._startDate, shiftDays)
+    const newEnd = DateUtils.addDays(this._startDate, shiftDays + durationDays - 1)
 
-    if (this.options.onTaskDrag) {
-      this.options.onTaskDrag(this.dragData.task, e, newStart, newEnd)
+    if (this._options.onTaskDrag) {
+      this._options.onTaskDrag(this._dragData.task, e, newStart, newEnd)
     }
   }
 
   /**
    * 调整大小结束事件处理
    */
-  private onResizeEndHandler(e: MouseEvent): void {
-    if (!this.dragData || !this.dragData.resizeType) return
+  private _onResizeEndHandler(e: MouseEvent): void {
+    if (!this._dragData || !this._dragData.resizeType) return
 
-    const columnWidth = this.options.columnWidth || 40
-    const currentLeft = parseInt(this.dragData.bar.style.left, 10) - 200 // 减去标签宽度
-    const currentWidth = parseInt(this.dragData.bar.style.width, 10)
+    const columnWidth = this._options.columnWidth || 40
+    const currentLeft = parseInt(this._dragData.bar.style.left, 10) - 200 // 减去标签宽度
+    const currentWidth = parseInt(this._dragData.bar.style.width, 10)
 
     // 计算新的开始和结束日期
     const shiftDays = Math.round(currentLeft / columnWidth)
     const durationDays = Math.round(currentWidth / columnWidth)
 
-    const newStart = addDays(this.startDate, shiftDays)
-    const newEnd = addDays(this.startDate, shiftDays + durationDays - 1)
+    const newStart = DateUtils.addDays(this._startDate, shiftDays)
+    const newEnd = DateUtils.addDays(this._startDate, shiftDays + durationDays - 1)
 
-    if (this.options.onDateChange) {
-      this.options.onDateChange(newStart, newEnd)
+    if (this._options.onDateChange) {
+      this._options.onDateChange(newStart, newEnd)
     }
 
-    document.removeEventListener("mousemove", this.onResizeMove)
-    document.removeEventListener("mouseup", this.onResizeEnd)
-    this.dragData = null
+    document.removeEventListener("mousemove", this._onResizeMove)
+    document.removeEventListener("mouseup", this._onResizeEnd)
+    this._dragData = null
   }
 
   /**
    * 鼠标移动事件处理（拖拽过程）
    */
-  private onMouseMoveHandler(e: MouseEvent): void {
-    if (!this.dragData) return
-    const deltaX = e.clientX - this.dragData.startX
-    const columnWidth = this.options.columnWidth || 40
+  private _onMouseMoveHandler(e: MouseEvent): void {
+    if (!this._dragData) return
+    const deltaX = e.clientX - this._dragData.startX
+    const columnWidth = this._options.columnWidth || 40
 
     // 计算新的位置
-    let newLeft = this.dragData.originalLeft + deltaX
+    let newLeft = this._dragData.originalLeft + deltaX
     // 吸附到网格
     newLeft = Math.round(newLeft / columnWidth) * columnWidth
-    this.dragData.bar.style.left = `${newLeft}px`
+    this._dragData.bar.style.left = `${newLeft}px`
 
     // 计算新的日期
     const daysShifted = Math.round(deltaX / columnWidth)
-    const newStart = addDays(parseDate(this.dragData.task.start), daysShifted)
-    const newEnd = addDays(parseDate(this.dragData.task.end), daysShifted)
+    const newStart = DateUtils.addDays(DateUtils.parseDate(this._dragData.task.start), daysShifted)
+    const newEnd = DateUtils.addDays(DateUtils.parseDate(this._dragData.task.end), daysShifted)
 
-    if (this.options.onDateChange) {
-      this.options.onDateChange(newStart, newEnd)
+    if (this._options.onDateChange) {
+      this._options.onDateChange(newStart, newEnd)
     }
   }
 
   /**
    * 鼠标松开事件处理（拖拽结束）
    */
-  private onMouseUpHandler(e: MouseEvent): void {
-    if (this.dragData) {
+  private _onMouseUpHandler(e: MouseEvent): void {
+    if (this._dragData) {
       // 移除拖拽样式
-      this.dragData.bar.classList.remove("dragging")
+      this._dragData.bar.classList.remove("dragging")
 
-      const columnWidth = this.options.columnWidth || 40
-      const currentLeft = parseInt(this.dragData.bar.style.left, 10)
+      const columnWidth = this._options.columnWidth || 40
+      const currentLeft = parseInt(this._dragData.bar.style.left, 10)
       // 计算天数变化: 减去标签宽度200
       const shiftDays = Math.round((currentLeft - 200) / columnWidth)
-      const newStart = addDays(this.startDate, shiftDays)
+      const newStart = DateUtils.addDays(this._startDate, shiftDays)
 
       // 计算任务持续天数，根据原始任务时间
-      const originalDuration = daysBetween(
-        this.dragData.task.start,
-        this.dragData.task.end
+      const originalDuration = DateUtils.daysBetween(
+        DateUtils.parseDate(this._dragData.task.start),
+        DateUtils.parseDate(this._dragData.task.end)
       )
-      const newEnd = addDays(newStart, originalDuration)
+      const newEnd = DateUtils.addDays(newStart, originalDuration)
 
       // 移除日期提示
-      if (this.element) {
-        const tooltip = this.element.querySelector(".gantt-drag-tooltip")
+      if (this._element) {
+        const tooltip = this._element.querySelector(".gantt-drag-tooltip")
         if (tooltip) {
           tooltip.remove()
         }
       }
 
       // 添加动画效果
-      this.dragData.bar.style.transition = "transform 0.2s ease"
-      this.dragData.bar.style.transform = "scale(1.05)"
+      this._dragData.bar.style.transition = "transform 0.2s ease"
+      this._dragData.bar.style.transform = "scale(1.05)"
       setTimeout(() => {
-        if (this.dragData && this.dragData.bar) {
-          this.dragData.bar.style.transform = "scale(1)"
+        if (this._dragData && this._dragData.bar) {
+          this._dragData.bar.style.transform = "scale(1)"
         }
       }, 200)
 
       // 触发回调
-      if (this.options.onTaskDrag) {
-        this.options.onTaskDrag(this.dragData.task, e, newStart, newEnd)
+      if (this._options.onTaskDrag) {
+        this._options.onTaskDrag(this._dragData.task, e, newStart, newEnd)
       }
 
-      this.dragData = null
-      document.removeEventListener("mousemove", this.onMouseMove)
-      document.removeEventListener("mouseup", this.onMouseUp)
+      this._dragData = null
+      document.removeEventListener("mousemove", this._onMouseMove)
+      document.removeEventListener("mouseup", this._onMouseUp)
     }
   }
 
@@ -628,10 +842,10 @@ export default class GanttChartCore {
    * 更新任务数据
    */
   updateTasks(tasks: Task[]): void {
-    this.tasks = tasks
-    this.endDate = this.calculateEndDate()
-    if (this.element) {
-      this.render(this.element)
+    this._tasks = tasks
+    this._endDate = this._calculateEndDate()
+    if (this._element) {
+      this.render(this._element)
     }
   }
 
@@ -639,81 +853,89 @@ export default class GanttChartCore {
    * 更新配置
    */
   updateOptions(options: Partial<GanttChartOptions>): void {
-    Object.assign(this.options, options)
+    Object.assign(this._options, options)
 
     // 更新虚拟滚动相关配置
     if (options.virtualScrolling !== undefined) {
-      this.virtualScrolling = options.virtualScrolling
+      this._virtualScrolling = options.virtualScrolling
     }
     if (options.visibleTaskCount !== undefined) {
-      this.visibleTaskCount = options.visibleTaskCount
+      this._visibleTaskCount = options.visibleTaskCount
     }
     if (options.bufferSize !== undefined) {
-      this.bufferSize = options.bufferSize
+      this._bufferSize = options.bufferSize
     }
 
-    if (this.element) {
-      this.render(this.element)
+    // 更新开始和结束日期
+    if (options.startDate) {
+      this._startDate = DateUtils.parseDate(options.startDate);
+    }
+    if (options.endDate) {
+      this._endDate = DateUtils.parseDate(options.endDate);
+    }
+
+    if (this._element) {
+      this.render(this._element)
     }
   }
 
   /**
    * 初始化虚拟滚动
    */
-  private initVirtualScrolling(): void {
-    if (!this.element) return
+  private _initVirtualScrolling(): void {
+    if (!this._element) return
 
     // 计算可见任务
-    this.updateVisibleTasks()
+    this._updateVisibleTasks()
 
     // 添加滚动事件监听
-    this.element.addEventListener("scroll", this.handleScroll)
+    this._element.addEventListener("scroll", this._handleScroll)
   }
 
   /**
    * 处理滚动事件
    */
-  private handleScrollHandler(): void {
-    if (!this.element || !this.virtualScrolling) return
+  private _handleScrollHandler(): void {
+    if (!this._element || !this._virtualScrolling) return
 
-    const newScrollTop = this.element.scrollTop
-    if (Math.abs(newScrollTop - this.scrollTop) > 10) {
-      this.scrollTop = newScrollTop
-      this.updateVisibleTasks()
-      this.renderVisibleTasks()
+    const newScrollTop = this._element.scrollTop
+    if (Math.abs(newScrollTop - this._scrollTop) > 10) {
+      this._scrollTop = newScrollTop
+      this._updateVisibleTasks()
+      this._renderVisibleTasks()
     }
   }
 
   /**
    * 更新可见任务列表
    */
-  private updateVisibleTasks(): void {
-    if (!this.virtualScrolling || !this.element) return
+  private _updateVisibleTasks(): void {
+    if (!this._virtualScrolling || !this._element) return
 
-    const rowHeight = this.options.rowHeight || 40
-    const scrollTop = this.element.scrollTop
+    const rowHeight = this._options.rowHeight || 40
+    const scrollTop = this._element.scrollTop
 
     // 计算开始和结束索引
     const startIndex = Math.max(
       0,
-      Math.floor(scrollTop / rowHeight) - this.bufferSize
+      Math.floor(scrollTop / rowHeight) - this._bufferSize
     )
     const endIndex = Math.min(
-      this.tasks.length,
-      startIndex + this.visibleTaskCount + 2 * this.bufferSize
+      this._tasks.length,
+      startIndex + this._visibleTaskCount + 2 * this._bufferSize
     )
 
     // 更新可见任务
-    this.visibleTasks = this.tasks.slice(startIndex, endIndex)
+    this._visibleTasks = this._tasks.slice(startIndex, endIndex)
   }
 
   /**
    * 渲染可见任务
    */
-  private renderVisibleTasks(): void {
-    if (!this.element) return
+  private _renderVisibleTasks(): void {
+    if (!this._element) return
 
-    const taskContainer = this.element.querySelector(".gantt-task-container") as HTMLElement
+    const taskContainer = this._element.querySelector(".gantt-task-container") as HTMLElement
     if (!taskContainer) return
 
     // 清空任务容器
@@ -722,16 +944,16 @@ export default class GanttChartCore {
     }
 
     // 渲染可见任务
-    const tasks = this.virtualScrolling ? this.visibleTasks : this.tasks
-    const rowHeight = this.options.rowHeight || 40
+    const tasks = this._virtualScrolling ? this._visibleTasks : this._tasks
+    const rowHeight = this._options.rowHeight || 40
 
     tasks.forEach((task) => {
       const taskRow = document.createElement("div")
       taskRow.className = "gantt-task-row"
 
       // 如果是虚拟滚动，设置任务行的位置
-      if (this.virtualScrolling) {
-        const taskIndex = this.tasks.findIndex((t) => t.id === task.id)
+      if (this._virtualScrolling) {
+        const taskIndex = this._tasks.findIndex((t) => t.id === task.id)
         taskRow.style.position = "absolute"
         taskRow.style.top = `${taskIndex * rowHeight}px`
         taskRow.style.width = "100%"
@@ -747,8 +969,8 @@ export default class GanttChartCore {
       const taskBar = document.createElement("div")
       taskBar.className = "gantt-task-bar"
 
-      const offset = this.getTaskOffset(task)
-      const width = this.getTaskWidth(task)
+      const offset = this._getTaskOffset(task)
+      const width = this._getTaskWidth(task)
       taskBar.style.left = `${offset + 200}px`
       taskBar.style.width = `${width}px`
       taskBar.style.backgroundColor = task.color || "#4e85c5"
@@ -766,7 +988,7 @@ export default class GanttChartCore {
       }
 
       // 如果开启拖拽，则设置样式
-      if (this.options.enableDragging !== false) {
+      if (this._options.enableDragging !== false) {
         taskBar.style.cursor = "move"
       }
 
@@ -775,8 +997,8 @@ export default class GanttChartCore {
     })
 
     // 设置容器高度以适应所有任务
-    if (this.virtualScrolling) {
-      taskContainer.style.height = `${this.tasks.length * rowHeight}px`
+    if (this._virtualScrolling) {
+      taskContainer.style.height = `${this._tasks.length * rowHeight}px`
       taskContainer.style.position = "relative"
     }
   }
@@ -784,20 +1006,20 @@ export default class GanttChartCore {
   /**
    * 处理容器大小变化
    */
-  private handleResizeHandler(): void {
-    if (!this.element) return
+  private _handleResizeHandler(): void {
+    if (!this._element) return
 
-    this.containerHeight = this.element.clientHeight
-    if (this.virtualScrolling) {
-      this.updateVisibleTasks()
-      this.renderVisibleTasks()
+    this._containerHeight = this._element.clientHeight
+    if (this._virtualScrolling) {
+      this._updateVisibleTasks()
+      this._renderVisibleTasks()
     }
   }
 
   /**
    * 防抖函数
    */
-  private debounce(func: Function, wait: number): () => void {
+  private _debounce(func: Function, wait: number): () => void {
     let timeout: number | null = null
     return () => {
       const later = () => {
@@ -816,32 +1038,32 @@ export default class GanttChartCore {
    * @param taskId 任务ID
    */
   scrollToTask(taskId: number | string): void {
-    if (!this.element) return
+    if (!this._element) return
     
     // 找到任务
-    const task = this.tasks.find(t => t.id === taskId)
+    const task = this._tasks.find(t => t.id === taskId)
     if (!task) return
     
     // 计算任务在甘特图中的位置
-    const taskIndex = this.tasks.indexOf(task)
+    const taskIndex = this._tasks.indexOf(task)
     if (taskIndex === -1) return
     
     // 计算任务在视图中的位置并滚动
-    const rowHeight = this.options.rowHeight || 40
+    const rowHeight = this._options.rowHeight || 40
     const scrollTop = taskIndex * rowHeight
     
-    this.element.scrollTo({
+    this._element.scrollTo({
       top: scrollTop,
       behavior: 'smooth'
     })
     
     // 计算水平位置并滚动
-    const taskStart = parseDate(task.start)
-    const daysDiff = daysBetween(this.startDate, taskStart)
-    const columnWidth = this.options.columnWidth || 40
+    const taskStart = DateUtils.parseDate(task.start)
+    const daysDiff = DateUtils.daysBetween(this._startDate, taskStart)
+    const columnWidth = this._options.columnWidth || 40
     const scrollLeft = daysDiff * columnWidth
     
-    this.element.scrollTo({
+    this._element.scrollTo({
       left: scrollLeft,
       behavior: 'smooth'
     })
@@ -852,17 +1074,16 @@ export default class GanttChartCore {
    * @param date 目标日期
    */
   scrollToDate(date: Date | string): void {
-    if (!this.element) return
+    if (!this._element) return
     
-    // 解析日期
-    const targetDate = typeof date === 'string' ? new Date(date) : date
+    const targetDate = typeof date === 'string' ? DateUtils.parseDate(date) : date
     
     // 计算日期在视图中的位置并滚动
-    const daysDiff = daysBetween(this.startDate, targetDate)
-    const columnWidth = this.options.columnWidth || 40
+    const daysDiff = DateUtils.daysBetween(this._startDate, targetDate)
+    const columnWidth = this._options.columnWidth || 40
     const scrollLeft = daysDiff * columnWidth
     
-    this.element.scrollTo({
+    this._element.scrollTo({
       left: scrollLeft,
       behavior: 'smooth'
     })
@@ -873,17 +1094,17 @@ export default class GanttChartCore {
    * @param mode 视图模式
    */
   setViewMode(mode: ViewMode): void {
-    if (!this.element) return
+    if (!this._element) return
     
     // 更新视图模式
-    this.options.viewMode = mode
+    this._options.viewMode = mode
     
     // 重新渲染
-    this.render(this.element)
+    this.render(this._element)
     
     // 触发视图变更回调
-    if (this.options.onViewChange) {
-      this.options.onViewChange(mode)
+    if (this._options.onViewChange) {
+      this._options.onViewChange(mode)
     }
   }
 
@@ -892,10 +1113,10 @@ export default class GanttChartCore {
    * @returns 可见任务数组
    */
   getVisibleTasks(): Task[] {
-    if (this.virtualScrolling) {
-      return this.visibleTasks
+    if (this._virtualScrolling) {
+      return this._visibleTasks
     } else {
-      return this.tasks
+      return this._tasks
     }
   }
   
@@ -904,18 +1125,16 @@ export default class GanttChartCore {
    * @param options 导出选项
    * @returns 数据URL的Promise
    */
-  async exportAsPNG(options?: { filename?: string }): Promise<string> {
-    if (!this.element) return Promise.reject("甘特图未渲染")
-    
-    const filename = options?.filename || 'gantt-chart.png'
+  async exportAsPNG(options: ExportOptions = {}): Promise<string> {
+    if (!this._element) return Promise.reject("甘特图未渲染");
     
     try {
-      // 使用utils中的exportToImage工具函数
-      const dataUrl = await exportToImage(this.element, filename)
-      return dataUrl
+      // 使用utils中的exportToImage工具函数，传递正确的options对象
+      const dataUrl = await ExportUtils.exportToImage(this._element, options);
+      return dataUrl;
     } catch (error) {
-      console.error("导出PNG失败:", error)
-      return Promise.reject(error)
+      console.error("导出PNG失败:", error);
+      return Promise.reject(error);
     }
   }
   
@@ -924,20 +1143,15 @@ export default class GanttChartCore {
    * @param options 导出选项
    * @returns PDF Blob的Promise
    */
-  async exportAsPDF(options?: { filename?: string }): Promise<Blob> {
-    if (!this.element) return Promise.reject("甘特图未渲染")
-    
-    const filename = options?.filename || 'gantt-chart.pdf'
+  async exportAsPDF(options: ExportOptions = {}): Promise<Blob> {
+    if (!this._element) return Promise.reject("甘特图未渲染");
     
     try {
-      // 使用utils中的exportToPDF工具函数
-      await exportToPDF(this.element, filename)
-      
-      // 这里仅为示例，实际应修改utils中的exportToPDF函数返回Blob对象
-      return new Blob(['PDF内容'], { type: 'application/pdf' })
+      // 使用utils中的exportToPDF工具函数，传递正确的options对象
+      return await ExportUtils.exportToPDF(this._element, options);
     } catch (error) {
-      console.error("导出PDF失败:", error)
-      return Promise.reject(error)
+      console.error("导出PDF失败:", error);
+      return Promise.reject(error);
     }
   }
 
@@ -949,7 +1163,7 @@ export default class GanttChartCore {
    */
   autoSchedule(respectDependencies: boolean = true): Task[] {
     // 创建任务副本以避免修改原始数据
-    const scheduledTasks = JSON.parse(JSON.stringify(this.tasks)) as Task[];
+    const scheduledTasks = JSON.parse(JSON.stringify(this._tasks)) as Task[];
     
     if (respectDependencies) {
       // 按依赖关系排序任务（拓扑排序）
@@ -1007,7 +1221,7 @@ export default class GanttChartCore {
           task.dependsOn.forEach(depId => {
             const dependencyTask = taskMap.get(depId);
             if (dependencyTask) {
-              const endDate = parseDate(dependencyTask.end);
+              const endDate = DateUtils.parseDate(dependencyTask.end);
               if (endDate > maxEndDate) {
                 maxEndDate = new Date(endDate);
               }
@@ -1016,20 +1230,20 @@ export default class GanttChartCore {
           
           // 调整当前任务的开始日期为依赖任务的最晚结束日期之后的一天
           if (maxEndDate.getTime() > 0) {
-            const startDate = addDays(maxEndDate, 1);
-            const taskDuration = daysBetween(parseDate(task.start), parseDate(task.end));
-            const endDate = addDays(startDate, taskDuration);
+            const startDate = DateUtils.addDays(maxEndDate, 1);
+            const taskDuration = DateUtils.daysBetween(DateUtils.parseDate(task.start), DateUtils.parseDate(task.end));
+            const endDate = DateUtils.addDays(startDate, taskDuration);
             
-            task.start = formatDate(startDate);
-            task.end = formatDate(endDate);
+            task.start = DateUtils.format(startDate);
+            task.end = DateUtils.format(endDate);
           }
         }
       });
     }
     
     // 触发自动排程完成回调
-    if (this.options.onAutoScheduleComplete) {
-      this.options.onAutoScheduleComplete(scheduledTasks);
+    if (this._options.onAutoScheduleComplete) {
+      this._options.onAutoScheduleComplete(scheduledTasks);
     }
     
     // 更新任务并重新渲染
@@ -1043,7 +1257,7 @@ export default class GanttChartCore {
    * @param theme 主题配置对象
    */
   applyTheme(theme: any): void {
-    if (!this.element) return;
+    if (!this._element) return;
     
     // 默认主题
     const defaultTheme = {
@@ -1108,5 +1322,148 @@ export default class GanttChartCore {
         stroke: ${currentTheme.dependencyLineColor};
       }
     `;
+  }
+
+  /**
+   * 准备和验证选项
+   * @param {GanttChartOptions} options - 原始选项
+   * @returns {GanttChartOptions} 处理后的选项
+   * @private
+   */
+  private _prepareOptions(options: GanttChartOptions): GanttChartOptions {
+    // 默认选项
+    const defaultOptions: Partial<GanttChartOptions> = {
+      columnWidth: 40,
+      rowHeight: 40,
+      headerHeight: 50,
+      showWeekends: true,
+      showToday: true,
+      showRowLines: true,
+      showColumnLines: true,
+      enableDependencies: true,
+      enableDragging: true,
+      enableResizing: true,
+      enableProgress: true,
+      viewMode: 'day'
+    };
+
+    // 合并默认选项和用户选项
+    return { ...defaultOptions, ...options };
+  }
+
+  /**
+   * 初始化主题
+   * @private
+   */
+  private _initializeTheme(): void {
+    // 默认主题
+    const defaultTheme: Record<string, string> = {
+      primary: '#1E88E5',
+      secondary: '#757575',
+      success: '#4CAF50',
+      warning: '#FFC107',
+      error: '#F44336',
+      textPrimary: '#212121',
+      textSecondary: '#757575',
+      borderColor: '#E0E0E0',
+      backgroundColor: '#FFFFFF',
+      taskColor: '#1E88E5',
+      milestoneColor: '#9C27B0',
+      projectColor: '#2196F3',
+      dependencyLineColor: '#90A4AE'
+    };
+
+    // 合并自定义主题
+    this._theme = { ...defaultTheme, ...(this._options.theme || {}) };
+  }
+
+  /**
+   * 处理任务点击事件
+   * @param {MouseEvent} e - 鼠标事件
+   * @private
+   */
+  private _handleTaskClick(e: MouseEvent): void {
+    const taskBar = e.currentTarget as HTMLElement;
+    const taskId = taskBar.getAttribute('data-task-id');
+    if (!taskId) return;
+
+    const task = this._tasks.find(t => String(t.id) === taskId);
+    if (task && this._options.onTaskClick) {
+      this._options.onTaskClick(task, e);
+    }
+  }
+
+  /**
+   * 处理任务双击事件
+   * @param {MouseEvent} e - 鼠标事件
+   * @private
+   */
+  private _handleTaskDoubleClick(e: MouseEvent): void {
+    const taskBar = e.currentTarget as HTMLElement;
+    const taskId = taskBar.getAttribute('data-task-id');
+    if (!taskId) return;
+
+    const task = this._tasks.find(t => String(t.id) === taskId);
+    if (task && this._options.onTaskDoubleClick) {
+      this._options.onTaskDoubleClick(task, e);
+    }
+  }
+
+  /**
+   * 注册事件监听器
+   * @param eventName 事件名称
+   * @param callback 回调函数
+   * @returns 取消注册的函数
+   */
+  public on(eventName: string, callback: EventCallback): () => void {
+    if (!this._eventListeners.has(eventName)) {
+      this._eventListeners.set(eventName, []);
+    }
+    
+    this._eventListeners.get(eventName)?.push(callback);
+    
+    return () => {
+      if (this._eventListeners.has(eventName)) {
+        this._eventListeners.get(eventName)?.filter(cb => cb !== callback);
+      }
+    };
+  }
+
+  /**
+   * 触发事件
+   * @param eventName 事件名称
+   * @param args 参数列表
+   */
+  private trigger(eventName: string, ...args: any[]): void {
+    if (this._eventListeners.has(eventName)) {
+      this._eventListeners.get(eventName)?.forEach(callback => {
+        callback(...args);
+      });
+    }
+  }
+
+  /**
+   * 附加DOM事件监听器
+   */
+  private attachEventListeners(): void {
+    // 具体实现略，需要添加对滚动、点击、拖拽等事件的处理
+  }
+
+  /**
+   * 销毁甘特图
+   */
+  public destroy(): void {
+    if (this.isDestroyed) return;
+    
+    // 移除所有事件监听器
+    this._eventListeners.clear();
+    
+    // 清空容器
+    if (this._element) {
+      this._element.innerHTML = '';
+    }
+    
+    // 标记为已销毁
+    this.isDestroyed = true;
   }
 }
