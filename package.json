@@ -1,13 +1,60 @@
 {
-  "name": "gantt-chart-component",
-  "version": "1.0.2",
-  "description": "这是一个同时支持React和Vue的甘特图组件，可用于项目管理和任务进度展示",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "name": "@Agions/gantt-chart-component",
+  "version": "1.1.0",
+  "description": "一个功能强大、同时支持React和Vue的甘特图组件，可用于项目管理和任务进度展示",
+  "main": "dist/react/index.js",
+  "module": "dist/react/index.esm.js",
+  "types": "dist/react/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/react/index.js",
+      "import": "./dist/react/index.esm.js",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./react": {
+      "require": "./dist/react/index.js",
+      "import": "./dist/react/index.esm.js",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./vue": {
+      "require": "./dist/vue/index.js",
+      "import": "./dist/vue/index.esm.js",
+      "types": "./dist/vue/index.d.ts"
+    },
+    "./style": "./dist/style.css"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npm run build:react && npm run build:styles",
+    "build:react": "rollup -c rollup.config.react.js --bundleConfigAsCjs",
+    "build:vue": "rollup -c rollup.config.vue.js --bundleConfigAsCjs",
+    "build:styles": "rollup -c rollup.config.styles.js --bundleConfigAsCjs",
+    "prepublishOnly": "npm run build",
+    "check-compat": "npx browserslist"
+  },
+  "browserslist": [
+    "last 2 versions",
+    "not dead",
+    "not ie <= 11",
+    "> 0.5%",
+    "Firefox ESR",
+    "maintained node versions"
+  ],
   "keywords": [
-    "甘特图"
+    "甘特图",
+    "gantt-chart",
+    "gantt",
+    "gantt-chart-react",
+    "gantt-chart-vue",
+    "gantt-chart-component",
+    "typescript",
+    "project-management"
   ],
   "author": "agions",
   "license": "MIT",
@@ -16,6 +63,44 @@
     "url": "git+https://github.com/Agions/gantt-chart-component.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://npm.pkg.github.com/",
+    "access": "public"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0",
+    "vue": ">=3.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.18.0",
+    "@babel/plugin-transform-runtime": "^7.26.10",
+    "@babel/preset-env": "^7.26.9",
+    "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.26.0",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@types/react": "^19.0.10",
+    "@vue/compiler-sfc": "^3.5.13",
+    "autoprefixer": "^10.4.21",
+    "browserslist": "^4.21.0",
+    "core-js": "^3.24.0",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^3.0.0",
+    "postcss": "^8.4.0",
+    "rollup": "^4.35.0",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-postcss": "^4.0.2",
+    "rollup-plugin-vue": "^6.0.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.26.10"
   }
 }

@@ -5,16 +5,33 @@
 
 class GanttChartCore {
   constructor(options = {}) {
+    this.stateManager = new StateManager({
+      tasks: options.tasks || [],
+      dependencies: options.dependencies || [],
+      viewSettings: {
+        mode: options.viewMode || 'day',
+        scrollPosition: 0
+      }
+    });
     this.tasks = options.tasks || [];
+    this.dependencies = options.dependencies || [];
     this.startDate = options.startDate || new Date();
     this.endDate = options.endDate || this._calculateEndDate();
     this.element = null;
+    this.svgElement = null;
     this.onTaskClick = options.onTaskClick || (() => {});
     this.onTaskDrag = options.onTaskDrag || (() => {});
-    this.viewMode = options.viewMode || 'day'; // day, week, month
+    this.onTaskDoubleClick = options.onTaskDoubleClick || (() => {});
+    this.onDateChange = options.onDateChange || (() => {});
+    this.onProgressChange = options.onProgressChange || (() => {});
+    this.onViewChange = options.onViewChange || (() => {});
+    this.viewMode = options.viewMode || 'day';
     this.columnWidth = options.columnWidth || 40;
     this.rowHeight = options.rowHeight || 40;
     this.headerHeight = options.headerHeight || 50;
+    this.theme = options.theme || 'default';
+    this.responsive = options.responsive || true;
+    this._initializeCache();
   }
 
   /**
@@ -56,11 +73,23 @@ class GanttChartCore {
     // 添加任务区域
     const taskContainer = this._createTaskContainer();
     ganttContainer.appendChild(taskContainer);
+
+    // 创建SVG图层
+    this.svgElement = this._createSvgLayer();
+    ganttContainer.appendChild(this.svgElement);
     
     element.appendChild(ganttContainer);
     
     // 绑定事件
     this._bindEvents();
+
+    // 渲染网格线
+    this._renderGrid();
+
+    // 渲染依赖关系
+    if (this.dependencies) {
+      this._renderDependencies();
+    }
   }
 
   /**
@@ -107,9 +136,21 @@ class GanttChartCore {
     const taskContainer = document.createElement('div');
     taskContainer.className = 'gantt-task-container';
     
-    this.tasks.forEach(task => {
+    // 创建虚拟滚动容器
+    const virtualContainer = document.createElement('div');
+    virtualContainer.className = 'gantt-virtual-container';
+    virtualContainer.style.height = `${this.stateManager.state.virtualScroll.totalHeight}px`;
+    
+    // 只渲染可见区域的任务
+    const visibleTasks = this.stateManager.getVisibleTasks();
+    
+    visibleTasks.forEach((task, index) => {
       const taskRow = document.createElement('div');
       taskRow.className = 'gantt-task-row';
+      taskRow.style.position = 'absolute';
+      taskRow.style.top = `${(task.index || index) * this.rowHeight}px`;
+      taskRow.style.width = '100%';
+      taskRow.style.height = `${this.rowHeight}px`;
       
       // 任务标签
       const taskLabel = document.createElement('div');
@@ -124,11 +165,32 @@ class GanttChartCore {
       taskBar.style.backgroundColor = task.color || '#4e85c5';
       taskBar.setAttribute('data-task-id', task.id);
       
+      // 添加进度条
+      if (typeof task.progress === 'number') {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'gantt-task-progress';
+        progressBar.style.width = `${task.progress}%`;
+        taskBar.appendChild(progressBar);
+      }
+      
+      // 添加任务信息提示
+      taskBar.title = `${task.name}\n开始: ${task.start}\n结束: ${task.end}`;
+      if (task.progress) {
+        taskBar.title += `\n进度: ${task.progress}%`;
+      }
+      
       taskRow.appendChild(taskLabel);
       taskRow.appendChild(taskBar);
       taskContainer.appendChild(taskRow);
+      
+      // 缓存已渲染的任务
+      this._cache.renderedTasks.add(task.id);
     });
     
+    // 添加滚动事件监听
+    taskContainer.addEventListener('scroll', this._handleScroll.bind(this));
+    
+    taskContainer.appendChild(virtualContainer);
     return taskContainer;
   }
 
@@ -174,22 +236,134 @@ class GanttChartCore {
   /**
    * 绑定事件
    */
+  /**
+   * 处理滚动事件
+   */
+  _handleScroll(event) {
+    const scrollTop = event.target.scrollTop;
+    if (Math.abs(scrollTop - this._cache.lastScrollPosition) < 10) return;
+
+    this._cache.lastScrollPosition = scrollTop;
+    this.stateManager.updateScrollPosition(scrollTop);
+    this._updateVisibleTasks();
+  }
+
+  /**
+   * 更新可见任务
+   */
+  _updateVisibleTasks() {
+    const visibleTasks = this.stateManager.getVisibleTasks();
+    const taskContainer = this.element.querySelector('.gantt-task-container');
+    
+    // 移除不可见的任务
+    Array.from(taskContainer.children).forEach(child => {
+      if (child.classList.contains('gantt-task-row')) {
+        const taskId = child.querySelector('.gantt-task-bar').getAttribute('data-task-id');
+        if (!visibleTasks.find(t => t.id.toString() === taskId)) {
+          taskContainer.removeChild(child);
+          this._cache.renderedTasks.delete(taskId);
+        }
+      }
+    });
+
+    // 添加新的可见任务
+    visibleTasks.forEach((task, index) => {
+      if (!this._cache.renderedTasks.has(task.id)) {
+        const taskRow = this._createTaskRow(task, index);
+        taskContainer.appendChild(taskRow);
+        this._cache.renderedTasks.add(task.id);
+      }
+    });
+  }
+
+  /**
+   * 创建任务行
+   */
+  _createTaskRow(task, index) {
+    const taskRow = document.createElement('div');
+    taskRow.className = 'gantt-task-row';
+    taskRow.style.position = 'absolute';
+    taskRow.style.top = `${(task.index || index) * this.rowHeight}px`;
+    taskRow.style.width = '100%';
+    taskRow.style.height = `${this.rowHeight}px`;
+
+    const taskLabel = document.createElement('div');
+    taskLabel.className = 'gantt-task-label';
+    taskLabel.textContent = task.name;
+
+    const taskBar = document.createElement('div');
+    taskBar.className = 'gantt-task-bar';
+    taskBar.style.left = `${this._getTaskOffset(task)}px`;
+    taskBar.style.width = `${this._getTaskWidth(task)}px`;
+    taskBar.style.backgroundColor = task.color || '#4e85c5';
+    taskBar.setAttribute('data-task-id', task.id);
+
+    if (typeof task.progress === 'number') {
+      const progressBar = document.createElement('div');
+      progressBar.className = 'gantt-task-progress';
+      progressBar.style.width = `${task.progress}%`;
+      taskBar.appendChild(progressBar);
+    }
+
+    taskBar.title = `${task.name}\n开始: ${task.start}\n结束: ${task.end}`;
+    if (task.progress) {
+      taskBar.title += `\n进度: ${task.progress}%`;
+    }
+
+    taskRow.appendChild(taskLabel);
+    taskRow.appendChild(taskBar);
+
+    return taskRow;
+  }
+
+  /**
+   * 绑定事件
+   */
   _bindEvents() {
     if (!this.element) return;
-    
-    // 任务点击事件
-    const taskBars = this.element.querySelectorAll('.gantt-task-bar');
-    taskBars.forEach(bar => {
-      bar.addEventListener('click', (e) => {
-        const taskId = e.target.getAttribute('data-task-id');
+
+    const taskContainer = this.element.querySelector('.gantt-task-container');
+
+    // 任务点击事件委托
+    taskContainer.addEventListener('click', (e) => {
+      const taskBar = e.target.closest('.gantt-task-bar');
+      if (taskBar) {
+        const taskId = taskBar.getAttribute('data-task-id');
         const task = this.tasks.find(t => t.id.toString() === taskId);
         if (task) {
           this.onTaskClick(task, e);
         }
-      });
+      }
     });
-    
-    // 这里可以添加拖拽事件等更复杂的交互
+
+    // 任务双击事件
+    taskContainer.addEventListener('dblclick', (e) => {
+      const taskBar = e.target.closest('.gantt-task-bar');
+      if (taskBar) {
+        const taskId = taskBar.getAttribute('data-task-id');
+        const task = this.tasks.find(t => t.id.toString() === taskId);
+        if (task) {
+          this.onTaskDoubleClick(task, e);
+        }
+      }
+    });
+
+    // 任务拖拽事件
+    taskContainer.addEventListener('mousedown', (e) => {
+      const taskBar = e.target.closest('.gantt-task-bar');
+      if (taskBar) {
+        const taskId = taskBar.getAttribute('data-task-id');
+        const task = this.tasks.find(t => t.id.toString() === taskId);
+        if (task) {
+          this._initTaskDrag(task, e, taskBar);
+        }
+      }
+    });
+
+    // 响应式处理
+    if (this.responsive) {
+      window.addEventListener('resize', this._handleResize.bind(this));
+    }
   }
 
   /**
@@ -204,14 +378,150 @@ class GanttChartCore {
   }
 
   /**
+   * 初始化缓存
+   */
+  _initializeCache() {
+    this._cache = {
+      taskPositions: new Map(),
+      renderedTasks: new Set(),
+      visibleRange: { start: 0, end: 0 },
+      lastScrollPosition: 0,
+      gridCache: null
+    };
+  }
+
+  /**
+   * 创建SVG图层
+   */
+  _createSvgLayer() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'gantt-svg-layer');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.width = '100%';
+    svg.style.height = '100%';
+    svg.style.pointerEvents = 'none';
+    return svg;
+  }
+
+  /**
+   * 渲染网格线
+   */
+  _renderGrid() {
+    if (!this.svgElement) return;
+    
+    // 使用缓存优化网格线渲染
+    if (this._cache.gridCache) {
+      this.svgElement.innerHTML = this._cache.gridCache;
+      return;
+    }
+
+    const gridLines = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    gridLines.setAttribute('class', 'grid-lines');
+
+    // 添加垂直网格线
+    const days = this._getDaysBetween(this.startDate, this.endDate);
+    for (let i = 0; i <= days; i++) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', `${i * this.columnWidth}`);
+      line.setAttribute('y1', '0');
+      line.setAttribute('x2', `${i * this.columnWidth}`);
+      line.setAttribute('y2', '100%');
+      line.setAttribute('stroke', '#e0e0e0');
+      line.setAttribute('stroke-width', '1');
+      gridLines.appendChild(line);
+    }
+
+    this.svgElement.appendChild(gridLines);
+    this._cache.gridCache = this.svgElement.innerHTML;
+  }
+
+  /**
+   * 渲染依赖关系
+   */
+  _renderDependencies() {
+    if (!this.svgElement || !this.dependencies.length) return;
+
+    const dependencyLines = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    dependencyLines.setAttribute('class', 'dependency-lines');
+
+    this.dependencies.forEach(dep => {
+      const fromTask = this.tasks.find(t => t.id === dep.fromId);
+      const toTask = this.tasks.find(t => t.id === dep.toId);
+
+      if (fromTask && toTask) {
+        const fromPos = this._getTaskPosition(fromTask);
+        const toPos = this._getTaskPosition(toTask);
+
+        const path = this._createDependencyPath(fromPos, toPos);
+        dependencyLines.appendChild(path);
+      }
+    });
+
+    this.svgElement.appendChild(dependencyLines);
+  }
+
+  /**
+   * 创建依赖关系路径
+   */
+  _createDependencyPath(fromPos, toPos) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const offset = 4;
+    
+    const startX = fromPos.right;
+    const startY = fromPos.center;
+    const endX = toPos.left;
+    const endY = toPos.center;
+    
+    const controlPoint1X = startX + offset;
+    const controlPoint2X = endX - offset;
+    
+    const d = `M ${startX} ${startY} 
+              C ${controlPoint1X} ${startY} ${controlPoint2X} ${endY} ${endX} ${endY}`;
+    
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', '#999');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('fill', 'none');
+    
+    return path;
+  }
+
+  /**
+   * 获取任务位置信息
+   */
+  _getTaskPosition(task) {
+    if (this._cache.taskPositions.has(task.id)) {
+      return this._cache.taskPositions.get(task.id);
+    }
+
+    const left = this._getTaskOffset(task);
+    const width = this._getTaskWidth(task);
+    const top = this.tasks.indexOf(task) * this.rowHeight;
+    
+    const position = {
+      left,
+      right: left + width,
+      top,
+      bottom: top + this.rowHeight,
+      center: top + this.rowHeight / 2
+    };
+
+    this._cache.taskPositions.set(task.id, position);
+    return position;
+  }
+
+  /**
    * 更新配置
    */
   updateOptions(options) {
     Object.assign(this, options);
+    this._initializeCache();
     if (this.element) {
       this.render(this.element);
     }
   }
 }
 
-export default GanttChartCore; 
+export default GanttChartCore;

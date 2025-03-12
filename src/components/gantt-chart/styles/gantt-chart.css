@@ -6,6 +6,11 @@
   font-family: Arial, sans-serif;
   overflow: auto;
   position: relative;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .gantt-header {
@@ -71,11 +76,41 @@
   border-radius: 3px;
   z-index: 1;
   cursor: pointer;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.gantt-task-progress {
+  position: absolute;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.2);
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.gantt-task-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
 }
 
 .gantt-task-bar:hover {
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.gantt-task-bar:active {
+  transform: translateY(0);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-task-bar.dragging {
+  opacity: 0.8;
+  z-index: 100;
 }
 
 .gantt-milestone {
@@ -115,4 +150,86 @@
 
 .gantt-container::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
-} 
+}
+
+/* 虚拟滚动相关样式 */
+.gantt-virtual-scroll {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 今日线样式优化 */
+.gantt-today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #ff5252;
+  z-index: 9;
+  pointer-events: none;
+}
+
+/* 周末列样式 */
+.gantt-day.weekend {
+  background-color: #f9f9f9;
+}
+
+/* 任务依赖线样式 */
+.gantt-dependency-line {
+  stroke: #ff5252;
+  stroke-width: 1.5;
+  stroke-dasharray: 5, 3;
+  marker-end: url(#arrowhead);
+}
+
+/* 任务调整大小手柄 */
+.gantt-task-resize-handle {
+  position: absolute;
+  width: 6px;
+  height: 100%;
+  top: 0;
+  background-color: transparent;
+  cursor: ew-resize;
+  z-index: 3;
+}
+
+.gantt-task-resize-handle.left {
+  left: 0;
+}
+
+.gantt-task-resize-handle.right {
+  right: 0;
+}
+
+/* 任务类型样式 */
+.gantt-task-bar.milestone {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 0;
+  transform: rotate(45deg);
+  background-color: #ff5722;
+  top: 14px;
+}
+
+.gantt-task-bar.project {
+  height: 24px;
+  top: 8px;
+  background-color: #3f51b5;
+  border-radius: 4px 4px 0 0;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .gantt-task-label {
+    width: 150px;
+    min-width: 150px;
+  }
+  
+  .gantt-timeline {
+    padding-left: 150px;
+  }
+  
+  .gantt-task-bar {
+    left: 150px;
+  }
+}

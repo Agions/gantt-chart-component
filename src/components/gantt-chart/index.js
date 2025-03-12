@@ -1,18 +1,45 @@
 /**
  * 甘特图组件库主入口
  */
-import GanttChartReact from './react/GanttChartReact';
 import GanttChartCore from './core/GanttChartCore';
 
-// Vue组件需要在Vue项目中引入
-// Vue不能直接导出，因为Vue组件需要在Vue环境中使用
-// import GanttChartVue from './vue/GanttChartVue.vue';
+// React组件
+import GanttChartReact from './react/GanttChartReact';
 
+// Vue组件
+import GanttChartVue from './vue/GanttChartVue.js';
+
+// 类型定义
+import * as Types from './core/types';
+
+// 工具函数
+import * as Utils from './core/utils';
+
+// 兼容性检测
+import { 
+  isCompatible, 
+  getCompatibilityDetails, 
+  checkBrowserCompatibility,
+  RECOMMENDED_BROWSERS
+} from './utils/browserCompat';
+
+// 导出组件和类型
 export {
-  GanttChartReact,
   GanttChartCore,
-  // GanttChartVue
+  GanttChartReact,
+  GanttChartVue,
+  Types,
+  Utils,
+  // 兼容性工具
+  isCompatible,
+  getCompatibilityDetails,
+  checkBrowserCompatibility,
+  RECOMMENDED_BROWSERS
 };
 
-// 默认导出React版本
-export default GanttChartReact; 
+// 默认导出
+export default {
+  GanttChartCore,
+  GanttChartReact,
+  GanttChartVue
+}; 

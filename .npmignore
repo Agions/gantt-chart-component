@@ -1,0 +1,78 @@
+# 开发和测试文件
+__tests__/
+test/
+tests/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
+.nyc_output/
+
+# 构建和工具配置
+.github/
+.circleci/
+.travis.yml
+.gitlab-ci.yml
+.jenkins
+.eslintrc
+.eslintrc.js
+.eslintrc.json
+.prettierrc
+.prettierrc.js
+.prettierignore
+tsconfig.json
+webpack.config.js
+babel.config.js
+rollup.config.js
+gulpfile.js
+jest.config.js
+
+# 源代码和文档
+src/
+docs/
+wiki/
+examples/
+demo/
+.storybook/
+storybook-static/
+
+# IDE和编辑器文件
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# 临时文件和日志
+*.log
+logs/
+temp/
+tmp/
+.cache/
+.tmp/
+
+# 开发环境配置
+.env
+.env.*
+!.env.example
+
+# Git相关
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# 其他不需要包含的文件
+*.tgz
+*.tsbuildinfo
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+# CHANGELOG.md 应该包含在NPM包中，以便用户了解版本更新 

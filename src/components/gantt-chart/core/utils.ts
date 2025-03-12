@@ -2,17 +2,17 @@
  * 甘特图工具函数
  */
 import { Task, Resource, ViewMode, Dependency } from './types';
+// 预先导入这些库，避免动态导入问题
+import * as htmlToImage from 'html-to-image';
+import jsPDF from 'jspdf';
 
 /**
  * 格式化日期为 YYYY-MM-DD 字符串
- * @param {Date | string} date 
+ * @param {Date} date 
  * @returns {string}
  */
-export const formatDate = (date: Date | string): string => {
+export const formatDate = (date: Date): string => {
   if (!date) return '';
-  if (!(date instanceof Date)) {
-    date = new Date(date);
-  }
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -223,46 +223,59 @@ export const tasksOverlap = (task1: Task, task2: Task): boolean => {
 
 /**
  * 导出甘特图为图片
- * @param {HTMLElement} element 
- * @param {string} filename 
+ * @param {HTMLElement} element 甘特图DOM元素
+ * @param {string} filename 保存的文件名
+ * @returns {Promise<string>} 数据URL
  */
-export const exportToImage = (element: HTMLElement, filename: string = 'gantt-chart.png'): void => {
-  import('html-to-image').then(htmlToImage => {
-    htmlToImage.toPng(element)
-      .then((dataUrl) => {
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = dataUrl;
-        link.click();
-      })
-      .catch((error) => {
-        console.error('导出图片出错:', error);
-      });
-  });
+export const exportToImage = async (element: HTMLElement, filename: string = 'gantt-chart.png'): Promise<string> => {
+  try {
+    const dataUrl = await htmlToImage.toPng(element);
+    
+    // 如果提供了文件名，则自动下载
+    if (filename) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+    }
+    
+    return dataUrl;
+  } catch (error) {
+    console.error('导出图片出错:', error);
+    return Promise.reject(error);
+  }
 };
 
 /**
  * 导出甘特图为PDF
- * @param {HTMLElement} element 
- * @param {string} filename 
+ * @param {HTMLElement} element 甘特图DOM元素
+ * @param {string} filename 保存的文件名
+ * @param {Object} options 导出选项
+ * @returns {Promise<Blob>} PDF Blob对象
  */
-export const exportToPDF = (element: HTMLElement, filename: string = 'gantt-chart.pdf'): void => {
-  import('html-to-image').then(htmlToImage => {
-    import('jspdf').then(({ default: jsPDF }) => {
-      htmlToImage.toPng(element)
-        .then((dataUrl) => {
-          const pdf = new jsPDF('l', 'mm', 'a4'); // 横向, 毫米, A4
-          const imgProps = pdf.getImageProperties(dataUrl);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(filename);
-        })
-        .catch((error) => {
-          console.error('导出PDF出错:', error);
-        });
-    });
-  });
+export const exportToPDF = async (element: HTMLElement, filename: string = 'gantt-chart.pdf', options: any = {}): Promise<Blob> => {
+  try {
+    const dataUrl = await htmlToImage.toPng(element);
+    const pdf = new jsPDF('l', 'mm', options.format || 'a4');
+    
+    const imgProps = pdf.getImageProperties(dataUrl);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    
+    // 如果提供了文件名，则自动下载
+    if (filename) {
+      pdf.save(filename);
+    }
+    
+    // 转换为Blob对象
+    const pdfBlob = pdf.output('blob');
+    return pdfBlob;
+  } catch (error) {
+    console.error('导出PDF出错:', error);
+    return Promise.reject(error);
+  }
 };
 
 export default {
