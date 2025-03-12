@@ -1,7 +1,7 @@
 /**
  * 甘特图React组件库入口
  */
-import GanttChartCore from './core/GanttChartCore';
+import { GanttChartCore } from './core/GanttChartCore';
 
 // React组件
 import GanttChartReact from './react/GanttChartReact';

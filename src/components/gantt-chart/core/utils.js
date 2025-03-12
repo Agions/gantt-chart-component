@@ -120,7 +120,8 @@ export const calculateAutoDateRange = (tasks) => {
   return { startDate: minDate, endDate: maxDate };
 };
 
-export default {
+// 定义默认导出对象
+const utilsExport = {
   formatDate,
   parseDate,
   daysBetween,
@@ -128,4 +129,7 @@ export default {
   getWeekNumber,
   randomColor,
   calculateAutoDateRange
-}; 
+};
+
+// 导出默认对象
+export default utilsExport; 

@@ -1,0 +1,196 @@
+/**
+ * 任务过滤与搜索组件样式
+ */
+
+.gantt-task-filter {
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  width: 100%;
+  max-width: 320px;
+  box-sizing: border-box;
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 14px;
+}
+
+.filter-search {
+  margin-bottom: 16px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  outline: none;
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-weight: bold;
+  color: #333;
+  font-size: 13px;
+}
+
+.filter-group select {
+  padding: 6px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background-color: #fff;
+  transition: all 0.3s;
+}
+
+.filter-group select:focus {
+  border-color: #1890ff;
+  outline: none;
+}
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-range input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.date-range span {
+  color: #999;
+  font-size: 12px;
+}
+
+.reset-button {
+  padding: 6px 12px;
+  background-color: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 8px;
+  align-self: flex-end;
+}
+
+.reset-button:hover {
+  background-color: #e6f7ff;
+  border-color: #91d5ff;
+  color: #1890ff;
+}
+
+.filter-results {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.filter-results h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.task-item {
+  position: relative;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  margin-bottom: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.task-item:hover {
+  background-color: #f0f7ff;
+}
+
+.task-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background-color: #52c41a;
+  transition: width 0.3s;
+}
+
+.task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.task-name {
+  font-weight: bold;
+  color: #333;
+}
+
+.task-dates {
+  font-size: 12px;
+  color: #666;
+}
+
+.task-type {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
+
+.milestone-badge, .project-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  color: white;
+}
+
+.milestone-badge {
+  background-color: #722ed1;
+}
+
+.project-badge {
+  background-color: #fa8c16;
+}
+
+.no-results {
+  padding: 16px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+} 
