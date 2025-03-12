@@ -23,6 +23,11 @@ jobs:
       - name: Install Dependencies 🔧
         run: npm install --force --legacy-peer-deps
 
+      - name: Fix ajv dependency 🔧
+        run: |
+          npm install ajv@8.12.0 --force
+          npm install ajv-keywords@5.1.0 --force
+
       - name: Build 🏗️
         run: npx react-scripts build
         env:
