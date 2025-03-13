@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, memo } from 'react';
+import '../../../App.css';
 
 interface TaskToolbarProps {
   onAddTask: (taskName: string) => void;
@@ -36,102 +37,62 @@ const TaskToolbarComponent: React.FC<TaskToolbarProps> = ({
     }
   }, [handleAddTask]);
 
-  // 使用useMemo缓存样式对象
-  const styles = useMemo(() => ({
-    buttonStyle: {
-      padding: '8px 16px',
-      margin: '0 5px',
-      backgroundColor: '#1890ff',
-      color: 'white',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-    },
-    disabledButtonStyle: {
-      padding: '8px 16px',
-      margin: '0 5px',
-      backgroundColor: '#d9d9d9',
-      color: 'white',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'not-allowed',
-    },
-    dangerButtonStyle: {
-      padding: '8px 16px',
-      margin: '0 5px',
-      backgroundColor: '#ff4d4f',
-      color: 'white',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-    },
-    container: {
-      display: 'flex', 
-      marginBottom: '20px', 
-      alignItems: 'center'
-    },
-    inputContainer: {
-      display: 'flex', 
-      flex: 1
-    },
-    input: {
-      padding: '8px 12px',
-      borderRadius: '4px',
-      border: '1px solid #d9d9d9',
-      marginRight: '10px',
-      flex: 1,
-    },
-    buttonContainer: {
-      display: 'flex', 
-      marginLeft: '20px'
-    }
-  }), []);
-
   return (
-    <div style={styles.container}>
-      <div style={styles.inputContainer}>
+    <div className="toolbar-container">
+      <div className="task-input-group">
         <input
           type="text"
           value={newTaskName}
           onChange={handleInputChange}
           placeholder="输入新任务名称"
-          style={styles.input}
+          className="task-input"
           onKeyDown={handleKeyDown}
         />
         <button
           onClick={handleAddTask}
-          style={styles.buttonStyle}
+          className="add-task-button"
         >
-          添加任务
+          添加
         </button>
       </div>
 
-      <div style={styles.buttonContainer}>
+      <div className="toolbar-actions">
         <button
           onClick={onUndo}
           disabled={!canUndo}
-          style={canUndo ? styles.buttonStyle : styles.disabledButtonStyle}
+          className={`toolbar-button ${!canUndo ? 'disabled' : ''}`}
           title="撤销"
           aria-label="撤销"
         >
-          ↩️ 撤销
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 10H16C19.866 10 23 13.134 23 17C23 20.866 19.866 24 16 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4 10L9 15M4 10L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>撤销</span>
         </button>
         <button
           onClick={onRedo}
           disabled={!canRedo}
-          style={canRedo ? styles.buttonStyle : styles.disabledButtonStyle}
+          className={`toolbar-button ${!canRedo ? 'disabled' : ''}`}
           title="重做"
           aria-label="重做"
         >
-          ↪️ 重做
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 10H8C4.134 10 1 13.134 1 17C1 20.866 4.134 24 8 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M20 10L15 15M20 10L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>重做</span>
         </button>
         <button
           onClick={onReset}
-          style={styles.dangerButtonStyle}
+          className="toolbar-button danger"
           title="重置所有数据"
           aria-label="重置"
         >
-          🔄 重置
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C7.5 2 3.5 5 2.5 10M2 2V8H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>重置</span>
         </button>
       </div>
     </div>

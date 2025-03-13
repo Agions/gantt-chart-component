@@ -362,9 +362,9 @@ export class StateManager {
     };
     
     // 更新所有任务的可见性
-    for (const taskId of collapsedParentIds) {
+    Array.from(collapsedParentIds).forEach(taskId => {
       setChildVisibility(taskId, false);
-    }
+    });
   }
 
   /**
@@ -832,13 +832,9 @@ export class StateManager {
    * @private
    */
   private _notifySubscribers(): void {
-    for (const subscriber of this._subscribers) {
-      try {
-        subscriber(this._state);
-      } catch (error) {
-        console.error('订阅者回调出错:', error);
-      }
-    }
+    Array.from(this._subscribers).forEach(subscriber => {
+      subscriber(this._state);
+    });
   }
   
   /**

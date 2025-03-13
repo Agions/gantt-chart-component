@@ -13,7 +13,7 @@ export type ViewMode = "day" | "week" | "month" | "quarter" | "year";
 /**
  * 任务ID类型
  */
-export type TaskId = string;
+export type TaskId = string|number;
 
 /**
  * 任务类型枚举
@@ -76,6 +76,7 @@ export interface Task extends BaseTask {
   resizable?: boolean;       // 是否可调整大小
   readonly?: boolean;        // 是否只读
   metadata?: TaskMetadata;   // 自定义元数据
+  critical?: boolean;        // 是否为关键路径上的任务
 }
 
 /**
@@ -247,6 +248,10 @@ export interface ExportOptions {
   format?: 'png' | 'jpeg' | 'pdf'; // 导出格式
   showTaskList?: boolean; // 是否包含任务列表
   margin?: number;       // 边距
+  backgroundColor?: string; // 背景颜色
+  includeHeader?: boolean; // 是否包含标题
+  headerText?: string;   // 标题文本
+  orientation?: 'portrait' | 'landscape'; // PDF 方向
 }
 
 /**

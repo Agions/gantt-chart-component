@@ -8,6 +8,8 @@ import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } 
 import { Task, Dependency, Resource, ViewMode, ExportOptions } from '../core/types';
 import utils, { daysBetween, addDays, formatDate } from '../core/utils';
 import createStateManager, { ViewSettings } from '../core/StateManager';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // 从utils中提取需要的工具
 const { ExampleGenerator } = utils;
@@ -66,7 +68,6 @@ export const EnhancedGanttChart = React.forwardRef<any, EnhancedGanttChartProps>
   const {
     tasks: propsTasks,
     dependencies: propsDependencies,
-    resources,
     options = {},
     viewMode = 'day',
     sampleCount = 10,
@@ -75,8 +76,6 @@ export const EnhancedGanttChart = React.forwardRef<any, EnhancedGanttChartProps>
     onTaskClick,
     onTaskDoubleClick,
     onDateRangeChange,
-    className,
-    style
   } = props;
 
   // 引用甘特图实例
@@ -236,19 +235,179 @@ export const EnhancedGanttChart = React.forwardRef<any, EnhancedGanttChartProps>
   }, [tasks]);
   
   // 导出为图片
-  const handleExportImage = useCallback((options?: ExportOptions) => {
-    if (ganttRef.current) {
-      return ganttRef.current.exportAsPNG(options);
+  const handleExportImage = useCallback(async (options?: ExportOptions) => {
+    console.log("EnhancedGanttChart: 开始导出PNG", options);
+    if (!containerRef.current) {
+      console.error("EnhancedGanttChart: 容器引用不存在");
+      throw new Error('甘特图容器未初始化');
     }
-    return null;
+    
+    try {
+      const defaultOptions = {
+        fileName: '甘特图',
+        backgroundColor: '#ffffff',
+        scale: 2,
+        includeHeader: true,
+        headerText: '项目甘特图'
+      };
+      
+      const exportOptions = { ...defaultOptions, ...options };
+      const { fileName, backgroundColor, scale, includeHeader, headerText } = exportOptions;
+      
+      let targetElement = containerRef.current;
+      let tempContainer: HTMLDivElement | null = null;
+      
+      if (includeHeader) {
+        console.log("EnhancedGanttChart: 创建带有标题的临时容器");
+        tempContainer = document.createElement('div');
+        tempContainer.style.background = backgroundColor || '#ffffff';
+        tempContainer.style.padding = '20px';
+        tempContainer.style.width = `${containerRef.current.scrollWidth}px`;
+        
+        // 添加标题
+        const header = document.createElement('div');
+        header.style.fontSize = '24px';
+        header.style.fontWeight = 'bold';
+        header.style.marginBottom = '15px';
+        header.style.textAlign = 'center';
+        header.textContent = headerText || '项目甘特图';
+        
+        tempContainer.appendChild(header);
+        
+        // 克隆甘特图
+        const ganttClone = containerRef.current.cloneNode(true) as HTMLElement;
+        tempContainer.appendChild(ganttClone);
+        
+        // 临时添加到DOM
+        document.body.appendChild(tempContainer);
+        targetElement = tempContainer;
+      }
+      
+      console.log("EnhancedGanttChart: 使用html2canvas捕获图像");
+      // 使用html2canvas捕获图像
+      const canvas = await html2canvas(targetElement, {
+        backgroundColor: backgroundColor || '#ffffff',
+        scale: scale || 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: true
+      });
+      
+      // 如果创建了临时容器，移除它
+      if (tempContainer) {
+        document.body.removeChild(tempContainer);
+      }
+      
+      console.log("EnhancedGanttChart: 图像生成成功，准备下载");
+      // 导出图像
+      const link = document.createElement('a');
+      link.download = `${fileName || 'gantt-chart'}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      return link.href;
+    } catch (error) {
+      console.error("EnhancedGanttChart: 导出PNG失败", error);
+      throw error;
+    }
   }, []);
   
   // 导出为PDF
-  const handleExportPDF = useCallback((options?: ExportOptions) => {
-    if (ganttRef.current) {
-      return ganttRef.current.exportAsPDF(options);
+  const handleExportPDF = useCallback(async (options?: ExportOptions) => {
+    console.log("EnhancedGanttChart: 开始导出PDF", options);
+    if (!containerRef.current) {
+      console.error("EnhancedGanttChart: 容器引用不存在");
+      throw new Error('甘特图容器未初始化');
     }
-    return null;
+    
+    try {
+      const defaultOptions = {
+        fileName: '甘特图',
+        backgroundColor: '#ffffff',
+        scale: 2,
+        includeHeader: true,
+        headerText: '项目甘特图',
+        orientation: 'landscape'
+      };
+      
+      const exportOptions = { ...defaultOptions, ...options };
+      const { fileName, backgroundColor, scale, includeHeader, headerText, orientation } = exportOptions;
+      
+      let targetElement = containerRef.current;
+      let tempContainer: HTMLDivElement | null = null;
+      
+      if (includeHeader) {
+        console.log("EnhancedGanttChart: 创建带有标题的临时容器");
+        tempContainer = document.createElement('div');
+        tempContainer.style.background = backgroundColor || '#ffffff';
+        tempContainer.style.padding = '20px';
+        tempContainer.style.width = `${containerRef.current.scrollWidth}px`;
+        
+        // 添加标题
+        const header = document.createElement('div');
+        header.style.fontSize = '24px';
+        header.style.fontWeight = 'bold';
+        header.style.marginBottom = '15px';
+        header.style.textAlign = 'center';
+        header.textContent = headerText || '项目甘特图';
+        
+        tempContainer.appendChild(header);
+        
+        // 克隆甘特图
+        const ganttClone = containerRef.current.cloneNode(true) as HTMLElement;
+        tempContainer.appendChild(ganttClone);
+        
+        // 临时添加到DOM
+        document.body.appendChild(tempContainer);
+        targetElement = tempContainer;
+      }
+      
+      console.log("EnhancedGanttChart: 使用html2canvas捕获图像用于PDF");
+      // 使用html2canvas捕获图像
+      const canvas = await html2canvas(targetElement, {
+        backgroundColor: backgroundColor || '#ffffff',
+        scale: scale || 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: true
+      });
+      
+      // 如果创建了临时容器，移除它
+      if (tempContainer) {
+        document.body.removeChild(tempContainer);
+      }
+      
+      console.log("EnhancedGanttChart: 图像生成成功，创建PDF");
+      // 创建PDF
+      const pdf = new jsPDF({
+        orientation: orientation === 'portrait' ? 'portrait' : 'landscape',
+        unit: 'mm'
+      });
+      
+      // 计算PDF尺寸
+      const imgWidth = orientation === 'portrait' ? 210 - 20 : 297 - 20; // A4尺寸减去边距
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // 添加图像到PDF
+      pdf.addImage(
+        canvas.toDataURL('image/png'),
+        'PNG',
+        10, // x坐标
+        10, // y坐标
+        imgWidth, 
+        imgHeight
+      );
+      
+      console.log("EnhancedGanttChart: PDF创建成功，准备下载");
+      // 保存PDF
+      pdf.save(`${fileName || 'gantt-chart'}.pdf`);
+      
+      // 返回PDF的数据URI
+      return pdf.output('datauristring');
+    } catch (error) {
+      console.error("EnhancedGanttChart: 导出PDF失败", error);
+      throw error;
+    }
   }, []);
   
   // 撤销操作
@@ -282,8 +441,31 @@ export const EnhancedGanttChart = React.forwardRef<any, EnhancedGanttChartProps>
       }
     },
     scrollToTask: handleScrollToTask,
+    
+    // 导出和全屏方法
     exportAsPNG: handleExportImage,
     exportAsPDF: handleExportPDF,
+    enterFullscreen: () => {
+      if (!containerRef.current) {
+        throw new Error('甘特图容器未初始化');
+      }
+      
+      try {
+        // 请求全屏
+        if (containerRef.current.requestFullscreen) {
+          containerRef.current.requestFullscreen();
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          (containerRef.current as any).webkitRequestFullscreen();
+        } else if ((containerRef.current as any).msRequestFullscreen) {
+          (containerRef.current as any).msRequestFullscreen();
+        } else {
+          console.warn('浏览器不支持全屏API');
+        }
+      } catch (error) {
+        console.error('进入全屏失败:', error);
+        throw error;
+      }
+    },
     
     // 增强的方法
     addTask: handleAddTask,
@@ -292,8 +474,8 @@ export const EnhancedGanttChart = React.forwardRef<any, EnhancedGanttChartProps>
     updateDependency: handleDependencyUpdate,
     undo: handleUndo,
     redo: handleRedo,
-    canUndo: () => stateManagerRef.current?.undoStackSize > 0 || false,
-    canRedo: () => stateManagerRef.current?.redoStackSize > 0 || false,
+    canUndo: () => (stateManagerRef.current && stateManagerRef.current.undoStackSize > 0) || false,
+    canRedo: () => (stateManagerRef.current && stateManagerRef.current.redoStackSize > 0) || false,
     getStateManager: () => stateManagerRef.current
   }));
   

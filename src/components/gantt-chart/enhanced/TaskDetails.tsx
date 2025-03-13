@@ -11,12 +11,15 @@ const formatDate = (date: string | Date): string => {
   return date.toLocaleDateString();
 };
 
-const getTaskTypeLabel = (type: string): string => {
+const getTaskTypeLabel = (type: string | undefined): string => {
+  if (!type) return '普通任务';
   switch (type) {
-    case 'task': return '任务';
-    case 'milestone': return '里程碑';
-    case 'project': return '项目';
-    default: return type;
+    case 'milestone':
+      return '里程碑';
+    case 'project':
+      return '项目';
+    default:
+      return '普通任务';
   }
 };
 

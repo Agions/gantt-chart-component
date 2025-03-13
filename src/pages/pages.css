@@ -1,0 +1,342 @@
+/* 共享样式 */
+.demo-page,
+.features-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* 演示页面样式 */
+.demo-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.demo-header h1 {
+  font-size: 2.5rem;
+  background: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 12px;
+}
+
+.demo-header p {
+  font-size: 1.1rem;
+  color: var(--color-gray-600);
+  max-width: 700px;
+  margin: 0 auto 30px;
+}
+
+.view-mode-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.view-mode-controls button {
+  background-color: var(--color-gray-100);
+  border: 1px solid var(--color-gray-300);
+  color: var(--color-gray-700);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.view-mode-controls button.active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  color: white;
+}
+
+.view-mode-controls button:hover {
+  background-color: var(--color-gray-200);
+}
+
+.view-mode-controls button.active:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.demo-chart {
+  height: 500px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  margin-bottom: 40px;
+}
+
+.demo-instructions {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  margin-bottom: 30px;
+}
+
+.demo-instructions h2 {
+  font-size: 1.5rem;
+  color: var(--color-gray-800);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.demo-instructions ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.demo-instructions li {
+  position: relative;
+  padding-left: 25px;
+  line-height: 1.6;
+}
+
+.demo-instructions li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.demo-footer {
+  text-align: center;
+  margin-top: 40px;
+  color: var(--color-gray-600);
+}
+
+.demo-footer a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.3s ease;
+}
+
+.demo-footer a:hover {
+  text-decoration-color: var(--color-primary);
+}
+
+/* 功能页面样式 */
+.features-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.features-header h1 {
+  font-size: 2.5rem;
+  background: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 16px;
+}
+
+.features-header p {
+  font-size: 1.2rem;
+  color: var(--color-gray-600);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.features-showcase {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 80px;
+}
+
+.feature-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.feature-icon {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.feature-card h3 {
+  color: var(--color-gray-800);
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.feature-card p {
+  color: var(--color-gray-600);
+  line-height: 1.6;
+}
+
+.use-cases {
+  margin-bottom: 80px;
+}
+
+.use-cases h2 {
+  text-align: center;
+  font-size: 2rem;
+  color: var(--color-gray-800);
+  margin-bottom: 40px;
+}
+
+.use-case {
+  display: flex;
+  margin-bottom: 60px;
+  gap: 40px;
+  align-items: center;
+}
+
+.use-case.reverse {
+  flex-direction: row-reverse;
+}
+
+.use-case-content {
+  flex: 1;
+}
+
+.use-case-content h3 {
+  font-size: 1.5rem;
+  color: var(--color-gray-800);
+  margin-bottom: 16px;
+}
+
+.use-case-content p {
+  color: var(--color-gray-600);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.use-case-content ul {
+  margin-left: 20px;
+}
+
+.use-case-content li {
+  color: var(--color-gray-700);
+  margin-bottom: 8px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.use-case-content li::before {
+  content: "✓";
+  color: var(--color-success);
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+}
+
+.use-case-image {
+  flex: 1;
+  min-height: 300px;
+  background-color: var(--color-gray-100);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-gray-500);
+  font-style: italic;
+}
+
+.cta-section {
+  text-align: center;
+  background-color: white;
+  padding: 50px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.cta-section h2 {
+  font-size: 1.8rem;
+  color: var(--color-gray-800);
+  margin-bottom: 16px;
+}
+
+.cta-section p {
+  color: var(--color-gray-600);
+  max-width: 600px;
+  margin: 0 auto 30px;
+  font-size: 1.1rem;
+}
+
+.cta-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.cta-button {
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.cta-button.primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.cta-button.primary:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cta-button.secondary {
+  background-color: white;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.cta-button.secondary:hover {
+  background-color: var(--color-gray-50);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .demo-instructions ul {
+    grid-template-columns: 1fr;
+  }
+  
+  .use-case, 
+  .use-case.reverse {
+    flex-direction: column;
+    gap: 30px;
+  }
+  
+  .features-showcase {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+  
+  .cta-buttons {
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .cta-button {
+    width: 100%;
+    max-width: 300px;
+    text-align: center;
+  }
+} 

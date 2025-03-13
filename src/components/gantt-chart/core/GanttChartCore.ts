@@ -114,7 +114,7 @@ export class GanttChartCore {
   private _animationFrameId: number | null = null;
   
   /** 主题配置 */
-  private _theme: Record<string, string> = {};
+  private _theme: Record<string, string | undefined> = {};
   
   /** 图片导出工具 */
   private imageExporter: ImageExporter;
@@ -202,16 +202,16 @@ export class GanttChartCore {
     this._initializeTheme();
     
     // 初始化导出工具
-    this.imageExporter = createImageExporter(this._element);
+    this.imageExporter = createImageExporter(this._element!);
     this.dataExporter = createDataExporter(
       this._tasks,
       this._dependencies,
       options.resources || []
     );
-    this.printManager = createPrintManager(this._element);
+    this.printManager = createPrintManager(this._element!);
     
     // 初始化渲染
-    this.render(this._element);
+    this.render(this._element!);
     
     // 添加事件监听器
     this.attachEventListeners();
@@ -1374,7 +1374,7 @@ export class GanttChartCore {
     };
 
     // 合并自定义主题
-    this._theme = { ...defaultTheme, ...(this._options.theme || {}) };
+    this._theme = { ...defaultTheme, ...(this._options.theme || {}) } as Record<string, string>;
   }
 
   /**

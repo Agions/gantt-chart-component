@@ -410,11 +410,11 @@ export const TaskUtils = {
     };
     
     // 对每个节点进行检查
-    for (const [nodeId] of graph) {
+    Array.from(graph.entries()).forEach(([nodeId]) => {
       if (!visited.has(nodeId) && isCyclic(nodeId)) {
         return true;
       }
-    }
+    });
     
     return false;
   }

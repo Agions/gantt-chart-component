@@ -8,10 +8,8 @@
  */
 
 import { Task, Dependency, TaskId } from './types';
-import utils, { daysBetween, addDays } from './utils';
+import { daysBetween, addDays } from './utils';
 
-// 从utils中提取DateUtils
-const { DateUtils } = utils;
 
 interface TaskNode {
   id: TaskId;
