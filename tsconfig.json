@@ -1,22 +1,21 @@
 {
   "compilerOptions": {
-    "target": "es2018",
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
     "module": "esnext",
     "moduleResolution": "node",
-    "jsx": "react",
-    "strict": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "outDir": "dist",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false
+    "jsx": "react-jsx",
+    "baseUrl": "src"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "files": ["shims-vue.d.ts"]
+  "include": ["src"],
+  "exclude": ["node_modules"]
 } 

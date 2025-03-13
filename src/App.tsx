@@ -1,116 +1,96 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Task, Dependency } from './components/gantt-chart/core/types';
-import { createCriticalPathAnalyzer } from './components/gantt-chart/core/CriticalPathAnalyzer';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Task } from './components/gantt-chart/core/types';
 import { TaskFilter } from './components/gantt-chart/enhanced/TaskFilter';
-import './components/gantt-chart/styles/TaskFilter.css';
 import { EnhancedGanttChart } from './components/gantt-chart/enhanced/EnhancedGanttChart';
+import { ViewModeSelector } from './components/gantt-chart/enhanced/ViewModeSelector';
+import { TaskDetails } from './components/gantt-chart/enhanced/TaskDetails';
+import { TaskList } from './components/gantt-chart/enhanced/TaskList';
+import { TaskToolbar } from './components/gantt-chart/enhanced/TaskToolbar';
+import { useGanttData } from './hooks/useGanttData';
+import { useCriticalPath } from './hooks/useCriticalPath';
+import './components/gantt-chart/styles/TaskFilter.css';
 import './components/gantt-chart/styles/EnhancedGanttChart.css';
-
-// 导入其他必要的组件和样式
+import './App.css';
 
 function App() {
   const ganttRef = useRef<any>(null);
-  
-  // 示例任务数据
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      name: '需求分析',
-      start: '2023-06-01',
-      end: '2023-06-10',
-      progress: 100,
-      type: 'task'
-    },
-    {
-      id: '2',
-      name: '设计阶段',
-      start: '2023-06-11',
-      end: '2023-06-25',
-      progress: 80,
-      type: 'task'
-    },
-    {
-      id: '3',
-      name: '开发阶段',
-      start: '2023-06-26',
-      end: '2023-07-15',
-      progress: 60,
-      type: 'task'
-    },
-    {
-      id: '4',
-      name: '测试阶段',
-      start: '2023-07-16',
-      end: '2023-07-25',
-      progress: 30,
-      type: 'task'
-    },
-    {
-      id: '5',
-      name: '项目发布',
-      start: '2023-07-26',
-      end: '2023-07-26',
-      progress: 0,
-      type: 'milestone'
-    }
-  ]);
-
-  // 示例依赖关系
-  const [dependencies, setDependencies] = useState<Dependency[]>([
-    { fromId: '1', toId: '2', type: 'finish_to_start' },
-    { fromId: '2', toId: '3', type: 'finish_to_start' },
-    { fromId: '3', toId: '4', type: 'finish_to_start' },
-    { fromId: '4', toId: '5', type: 'finish_to_start' }
-  ]);
+  const {
+    tasks,
+    dependencies,
+    handleTasksChange,
+    handleDependenciesChange,
+    addTask,
+    deleteTask,
+    updateTask,
+    undo,
+    redo,
+    resetData,
+    canUndo,
+    canRedo
+  } = useGanttData();
 
   const [filteredTasks, setFilteredTasks] = useState<Task[]>(tasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [criticalTasks, setCriticalTasks] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
+  
+  const { criticalTasks } = useCriticalPath(tasks, dependencies);
 
-  // 当任务列表变化时分析关键路径
+  // 当任务变化时，更新过滤后的任务列表
   useEffect(() => {
-    const analyzer = createCriticalPathAnalyzer(tasks, dependencies);
-    const result = analyzer.analyze();
-    
-    // 获取关键路径上的任务ID列表
-    const criticalTasksSet = new Set(result.criticalTasks.map(String));
-    setCriticalTasks(criticalTasksSet);
-    
-    // 更新filtered任务
     setFilteredTasks(tasks);
-  }, [tasks, dependencies]);
+  }, [tasks]);
 
-  // 处理任务过滤
-  const handleFilterChange = (filtered: Task[]) => {
+  // 处理任务过滤 - 使用useCallback记忆化
+  const handleFilterChange = useCallback((filtered: Task[]) => {
     setFilteredTasks(filtered);
-  };
+  }, []);
 
-  // 处理任务选择
-  const handleTaskSelect = (task: Task) => {
+  // 处理任务选择 - 使用useCallback记忆化
+  const handleTaskSelect = useCallback((task: Task) => {
     setSelectedTask(task);
     if (ganttRef.current) {
       ganttRef.current.scrollToTask(task.id);
     }
-  };
+  }, []);
   
-  // 处理任务变更
-  const handleTasksChange = (updatedTasks: Task[]) => {
-    setTasks(updatedTasks);
-  };
-  
-  // 处理依赖关系变更
-  const handleDependenciesChange = (updatedDeps: Dependency[]) => {
-    setDependencies(updatedDeps);
-  };
-  
-  // 处理视图模式变更
-  const handleViewModeChange = (mode: 'day' | 'week' | 'month') => {
+  // 处理视图模式变更 - 使用useCallback记忆化
+  const handleViewModeChange = useCallback((mode: 'day' | 'week' | 'month') => {
     setViewMode(mode);
     if (ganttRef.current) {
       ganttRef.current.setViewMode(mode);
     }
-  };
+  }, []);
+
+  // 处理添加任务 - 使用useCallback记忆化
+  const handleAddTask = useCallback((taskName: string) => {
+    const newTask = addTask({ name: taskName });
+    // 选择新创建的任务
+    setSelectedTask(newTask);
+  }, [addTask]);
+  
+  // 处理重置数据 - 使用useCallback记忆化
+  const handleReset = useCallback(() => {
+    if (window.confirm('确定要重置所有数据吗？这将删除所有您的更改。')) {
+      resetData();
+      setSelectedTask(null);
+    }
+  }, [resetData]);
+
+  // 使用useMemo缓存甘特图配置
+  const ganttOptions = useMemo(() => ({
+    allowTaskDrag: true,
+    allowTaskResize: true,
+    enableDependencies: true,
+    showProgress: true,
+    theme: {
+      primary: '#1890ff',
+      taskBorder: '#91d5ff',
+      taskBackground: '#e6f7ff',
+      milestoneColor: '#722ed1',
+      criticalTaskBackground: '#fff2f0',
+      criticalTaskBorder: '#ff4d4f'
+    }
+  }), []);
 
   return (
     <div className="container">
@@ -119,7 +99,7 @@ function App() {
         <p>这是一个展示甘特图功能的React应用，部署在GitHub Pages上</p>
         <a 
           className="github-link" 
-          href="https://github.com/Agions/gantt-chart-demo" 
+          href="https://github.com/Agions/gantt-chart-component" 
           target="_blank" 
           rel="noopener noreferrer"
         >
@@ -128,95 +108,43 @@ function App() {
       </header>
 
       <div className="card">
-        <h2>视图控制</h2>
-        <div style={{ marginBottom: '15px' }}>
-          <button 
-            onClick={() => handleViewModeChange('day')} 
-            style={{ 
-              padding: '8px 16px', 
-              marginRight: '10px', 
-              backgroundColor: viewMode === 'day' ? '#1890ff' : '#f0f0f0',
-              color: viewMode === 'day' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            日视图
-          </button>
-          <button 
-            onClick={() => handleViewModeChange('week')} 
-            style={{ 
-              padding: '8px 16px', 
-              marginRight: '10px', 
-              backgroundColor: viewMode === 'week' ? '#1890ff' : '#f0f0f0',
-              color: viewMode === 'week' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            周视图
-          </button>
-          <button 
-            onClick={() => handleViewModeChange('month')} 
-            style={{ 
-              padding: '8px 16px', 
-              backgroundColor: viewMode === 'month' ? '#1890ff' : '#f0f0f0',
-              color: viewMode === 'month' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            月视图
-          </button>
-        </div>
+        <h2>任务管理</h2>
+        <TaskToolbar 
+          onAddTask={handleAddTask}
+          onUndo={undo}
+          onRedo={redo}
+          onReset={handleReset}
+          canUndo={canUndo}
+          canRedo={canRedo}
+        />
+
+        <h3>视图控制</h3>
+        <ViewModeSelector 
+          currentMode={viewMode} 
+          onModeChange={handleViewModeChange} 
+        />
       </div>
 
       <div className="card">
         <h2>交互式甘特图（支持拖拽和依赖线）</h2>
-        <div style={{ height: '400px', marginBottom: '20px' }}>
+        <div style={{ height: '400px', marginBottom: '20px', border: '1px solid #e8e8e8', borderRadius: '4px' }}>
           <EnhancedGanttChart
             tasks={tasks}
             dependencies={dependencies}
             viewMode={viewMode}
             onTasksChange={handleTasksChange}
             onDependenciesChange={handleDependenciesChange}
-            onTaskClick={(task) => setSelectedTask(task)}
-            options={{
-              allowTaskDrag: true,
-              allowTaskResize: true,
-              enableDependencies: true,
-              showProgress: true,
-              theme: {
-                primary: '#1890ff',
-                taskBorder: '#91d5ff',
-                taskBackground: '#e6f7ff',
-                milestoneColor: '#722ed1',
-                criticalTaskBackground: '#fff2f0',
-                criticalTaskBorder: '#ff4d4f'
-              }
-            }}
+            onTaskClick={handleTaskSelect}
+            options={ganttOptions}
             ref={ganttRef}
           />
         </div>
         
         {selectedTask && (
-          <div style={{ 
-            padding: '15px', 
-            backgroundColor: '#f9f9f9', 
-            border: '1px solid #d9d9d9',
-            borderRadius: '4px',
-            marginBottom: '20px'
-          }}>
-            <h3>选中的任务</h3>
-            <p><strong>名称:</strong> {selectedTask.name}</p>
-            <p><strong>时间段:</strong> {typeof selectedTask.start === 'string' ? selectedTask.start : selectedTask.start.toLocaleDateString()} 至 {typeof selectedTask.end === 'string' ? selectedTask.end : selectedTask.end.toLocaleDateString()}</p>
-            <p><strong>进度:</strong> {selectedTask.progress}%</p>
-            <p><strong>类型:</strong> {selectedTask.type === 'task' ? '任务' : selectedTask.type === 'milestone' ? '里程碑' : '项目'}</p>
-            <p><strong>是否为关键任务:</strong> {criticalTasks.has(String(selectedTask.id)) ? '是' : '否'}</p>
-          </div>
+          <TaskDetails 
+            task={selectedTask} 
+            isCritical={criticalTasks.has(String(selectedTask.id))} 
+          />
         )}
       </div>
 
@@ -230,32 +158,14 @@ function App() {
       </div>
 
       <div className="card">
-        <h2>关键路径分析</h2>
-        <div>
-          <h3>项目任务列表</h3>
-          <ul>
-            {filteredTasks.map(task => (
-              <li key={task.id} style={{ 
-                padding: '10px', 
-                marginBottom: '5px', 
-                backgroundColor: criticalTasks.has(String(task.id)) ? '#ffecec' : '#f9f9f9',
-                border: criticalTasks.has(String(task.id)) ? '1px solid #ff4d4f' : '1px solid #d9d9d9',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-              onClick={() => handleTaskSelect(task)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span><strong>{task.name}</strong> {criticalTasks.has(String(task.id)) && <span style={{ color: 'red' }}>(关键任务)</span>}</span>
-                  <span>{task.progress}%</span>
-                </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  {typeof task.start === 'string' ? task.start : task.start.toLocaleDateString()} 至 {typeof task.end === 'string' ? task.end : task.end.toLocaleDateString()}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <h2>关键路径分析与任务管理</h2>
+        <TaskList 
+          tasks={filteredTasks}
+          criticalTasks={criticalTasks}
+          onTaskSelect={handleTaskSelect}
+          onTaskDelete={deleteTask}
+          onTaskUpdate={updateTask}
+        />
       </div>
 
       <footer className="footer">
