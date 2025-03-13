@@ -20,18 +20,23 @@ jobs:
           # 移除缓存设置，因为我们忽略了锁文件
           # cache: 'npm'
 
-      - name: Install Dependencies 🔧
-        run: npm install --force --legacy-peer-deps
-
-      - name: Fix ajv dependency 🔧
+      - name: Clean node_modules and install dependencies 🧹
         run: |
-          npm install ajv@8.12.0 --force
-          npm install ajv-keywords@5.1.0 --force
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+
+      - name: Fix dependencies in specific order 🔧
+        run: |
+          npm uninstall ajv ajv-keywords --no-save
+          npm install ajv@6.12.6 --save-exact --no-package-lock
+          npm install ajv-keywords@3.5.2 --save-exact --no-package-lock
+          npm list ajv
 
       - name: Build 🏗️
         run: npx react-scripts build
         env:
           CI: false # 这让React不会因为警告而停止构建
+          PUBLIC_URL: /gantt-chart-component
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
