@@ -1,13 +1,17 @@
 {
   "files": {
-    "main.css": "/gantt-chart-component/static/css/main.7ea9d4fd.css",
-    "main.js": "/gantt-chart-component/static/js/main.7d0d00f9.js",
+    "main.css": "/gantt-chart-component/static/css/main.38ef773d.css",
+    "main.js": "/gantt-chart-component/static/js/main.b09501d6.js",
+    "static/js/213.66bc694c.chunk.js": "/gantt-chart-component/static/js/213.66bc694c.chunk.js",
+    "static/js/732.99c026e2.chunk.js": "/gantt-chart-component/static/js/732.99c026e2.chunk.js",
     "index.html": "/gantt-chart-component/index.html",
-    "main.7ea9d4fd.css.map": "/gantt-chart-component/static/css/main.7ea9d4fd.css.map",
-    "main.7d0d00f9.js.map": "/gantt-chart-component/static/js/main.7d0d00f9.js.map"
+    "main.38ef773d.css.map": "/gantt-chart-component/static/css/main.38ef773d.css.map",
+    "main.b09501d6.js.map": "/gantt-chart-component/static/js/main.b09501d6.js.map",
+    "213.66bc694c.chunk.js.map": "/gantt-chart-component/static/js/213.66bc694c.chunk.js.map",
+    "732.99c026e2.chunk.js.map": "/gantt-chart-component/static/js/732.99c026e2.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.7ea9d4fd.css",
-    "static/js/main.7d0d00f9.js"
+    "static/css/main.38ef773d.css",
+    "static/js/main.b09501d6.js"
   ]
 }
