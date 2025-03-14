@@ -811,30 +811,30 @@ function App() {
                 >
                   <span>{exportingData ? '⏳' : '💾'}</span>
                 </button>
-                <button 
+          <button 
                   className={`action-button ${exportingPng ? 'processing' : ''}`} 
                   title="导出为PNG" 
                   onClick={exportAsPNG}
                   disabled={exportingPng || exportingPdf || exportingData || importingData}
                 >
                   <span>{exportingPng ? '⏳' : '📷'}</span>
-                </button>
-                <button 
+          </button>
+          <button 
                   className={`action-button ${exportingPdf ? 'processing' : ''}`} 
                   title="导出为PDF" 
                   onClick={exportAsPDF}
                   disabled={exportingPng || exportingPdf || exportingData || importingData}
                 >
                   <span>{exportingPdf ? '⏳' : '📄'}</span>
-                </button>
-                <button 
+          </button>
+          <button 
                   className="action-button" 
                   title="全屏" 
                   onClick={toggleFullscreen}
                   disabled={exportingPng || exportingPdf || exportingData || importingData}
                 >
                   <span>⛶</span>
-                </button>
+          </button>
                 {/* 隐藏的文件输入框 */}
                 <input
                   type="file"
@@ -843,8 +843,8 @@ function App() {
                   accept=".json"
                   onChange={handleFileSelect}
                 />
-              </div>
-            </div>
+        </div>
+      </div>
 
             {/* 导出提示信息 */}
             {(exportingPng || exportingPdf || exportingData) && (
@@ -860,27 +860,27 @@ function App() {
             )}
 
             <div className="chart-container" ref={chartContainerRef}>
-              <EnhancedGanttChart
-                tasks={tasks}
-                dependencies={dependencies}
-                viewMode={viewMode}
-                onTasksChange={handleTasksChange}
-                onDependenciesChange={handleDependenciesChange}
+          <EnhancedGanttChart
+            tasks={tasks}
+            dependencies={dependencies}
+            viewMode={viewMode}
+            onTasksChange={handleTasksChange}
+            onDependenciesChange={handleDependenciesChange}
                 onTaskClick={handleTaskSelect}
                 options={ganttOptions}
-                ref={ganttRef}
-              />
-            </div>
+            ref={ganttRef}
+          />
+        </div>
           </section>
 
           <section className="content-card task-list-container">
             <TaskList 
               tasks={filteredTasks}
               criticalTasks={criticalTasks}
-              onTaskSelect={handleTaskSelect}
+          onTaskSelect={handleTaskSelect}
               onTaskDelete={deleteTask}
               onTaskUpdate={updateTask}
-            />
+        />
           </section>
         </main>
       </div>
@@ -913,12 +913,12 @@ function App() {
               <a href="#" title="掘金" aria-label="掘金">
                 <span>📝</span>
               </a> */}
-            </div>
-          </div>
+                </div>
+                </div>
         </div>
         <div className="footer-bottom">
           <p>© {new Date().getFullYear()} 甘特图专业版 | 保留所有权利</p>
-        </div>
+      </div>
       </footer>
     </div>
   );

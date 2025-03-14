@@ -71,7 +71,7 @@
     "url": "git+https://github.com/Agions/gantt-chart-component.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/",
+    "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
   "peerDependencies": {
