@@ -34,7 +34,7 @@ jobs:
 
       - name: Build 🏗️
         run: |
-          npm run build
+          npm run predeploy
         env:
           CI: false
           PUBLIC_URL: /gantt-chart-component
